@@ -5,6 +5,7 @@
 
 # can help in case /tmp has not enough space
 #TMPDIR=/opt/zapret/tmp
+test
 
 # redefine user for zapret daemons. required on Keenetic
 #WS_USER=nobody
