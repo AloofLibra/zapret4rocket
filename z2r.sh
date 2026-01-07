@@ -139,7 +139,7 @@ get_repo() {
     echo "Востановление листа исключений выполнено."
   fi
   #Копирование нашего конфига на замену стандартному и скриптов для войсов DS, WA, TG
-  curl -L -o /opt/zapret2/config.default https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z2r/config.default
+  curl -L -o /opt/zapret2/config.default https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/config.default
   if command -v nft >/dev/null 2>&1; then
     sed -i 's/^FWTYPE=iptables$/FWTYPE=nftables/' "/opt/zapret2/config.default"
   fi
