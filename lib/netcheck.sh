@@ -52,8 +52,8 @@ check_access_list() {
    check_access "https://www.youtube.com/"
    echo "Проверка доступности $(get_yt_cluster_domain) (YT TCP)"
    check_access "https://$(get_yt_cluster_domain)"
-   echo "Проверка доступности meduza.io (RKN list)"
-   check_access "https://meduza.io"
+   echo "Проверка доступности rutracker.org (RKN list)"
+   check_access "https://rutracker.org"
    echo "Проверка доступности www.instagram.com (RKN list + нужен рабочий DNS)"
    check_access "https://www.instagram.com/"
 }
