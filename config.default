@@ -128,6 +128,17 @@ NFQWS2_OPT="
 --lua-desync=fake:blob=maxru:tcp_flags_unset=ACK:tls_mod=rnd,dupsid,padencap:repeats=1:strategy=19
 --lua-desync=fakeddisorder:pos=2:tcp_flags_unset=ACK:strategy=19
 
+# Strategy 20
+--lua-desync=http_methodeol:strategy=20
+
+# Strategy 21
+--lua-desync=wssize:wsize=1:scale=6:strategy=21
+--lua-desync=multidisorder:pos=2:strategy=21
+
+# Strategy 22
+--lua-desync=syndata:strategy=22
+--lua-desync=multidisorder:strategy=22
+
 --new
 
 --filter-tcp=80,443 --hostlist=/opt/zapret2/discord.txt
@@ -160,7 +171,6 @@ NFQWS2_OPT="
 --skip --filter-udp=1026-65531
 --blob=fake_quic_unknown_udp:/opt/zapret/files/fake/quic_initial_www_google_com.bin
 --lua-desync=fake:udp:blob=fake_quic_unknown_udp:ip_autottl=2:repeats=10
-
 "
 
 
