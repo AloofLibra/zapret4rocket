@@ -228,10 +228,10 @@ done
 
 #Скачивание, распаковка архива zapret2, очистка от ненуных бинарей
 zapret_get() {
- if [[ "$OSystem" == "VPS" ]]; then
-     tarfile="zapret2-v$VER.tar.gz"
- else
+ if [[ "$OSystem" == "WRT" ]]; then
      tarfile="zapret2-v$VER-openwrt-embedded.tar.gz"
+ else
+     tarfile="zapret2-v$VER.tar.gz"
  fi
  curl -L "https://github.com/bol-van/zapret2/releases/download/v$VER/$tarfile" | tar -xz
  mv "zapret2-v$VER" zapret2
