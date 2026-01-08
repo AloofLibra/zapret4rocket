@@ -66,12 +66,6 @@ source "$SCRIPT_DIR/zapret2/z2r_lib/ui.sh"
 # (внутр.: _detect_api_simple)
 source "$SCRIPT_DIR/zapret2/z2r_lib/provider.sh" 
 
-# Upload endpoint for blockcheck summary (Google Apps Script Web App).
-# Leave empty to disable upload until configured.
-BLOCKCHECK2_APPS_SCRIPT_URL="https://script.google.com/macros/s/AKfycbw3Ld89hPsjYHSqwjMvL9g4a2PvgmgbHR1b3fpyHlA7WZPGVQVlR8Z7UW29BkUcKeJ4/exec"
-# Shared secret for Apps Script upload (optional, but recommended).
-BLOCKCHECK2_SHARED_SECRET="N7h6h665ANMIxAvYbZmljWj8tkwK2Xqg"
-
 # Телеметрия (вкл/выкл один раз + отправка статистики в Google Forms)
 # Функции: init_telemetry, send_stats
 source "$SCRIPT_DIR/zapret2/z2r_lib/telemetry.sh" 
@@ -128,9 +122,8 @@ blockcheck2_run_summary() {
   local log_dir="/opt/zapret2/extra_strats/cache/blockcheck2"
   local provider_file="/opt/zapret2/extra_strats/cache/provider.txt"
   local provider_label="" provider_sanitized="" ts=""
-  local log_file="" summary_file="" upload_file="" summary_public=""
+  local log_file="" summary_file="" summary_public=""
   local uuid_suffix=""
-  local upload_ok=0
   local was_running=0 rc=0
   local pid=0 start_ts=0
 
@@ -158,7 +151,6 @@ blockcheck2_run_summary() {
   uuid_suffix="$(blockcheck2_get_uuid)"
   log_file="$log_dir/blockcheck2_${provider_sanitized}_${ts}_${uuid_suffix}.log"
   summary_file="$log_dir/blockcheck2_${provider_sanitized}_${ts}_${uuid_suffix}.summary"
-  upload_file="$log_dir/blockcheck2_${provider_sanitized}_${ts}_${uuid_suffix}.txt"
   summary_public="/opt/zapret2/blockcheck2_summary.txt"
 
   echo -e "${yellow}Запускаю blockcheck2 (BATCH=1)...${plain}"
@@ -166,12 +158,17 @@ blockcheck2_run_summary() {
   BATCH=1 ZAPRET_BASE=/opt/zapret2 "$blockcheck_path" >"$log_file" 2>&1 &
   pid=$!
   if [ "$pid" -gt 0 ]; then
-    local spin='|/-\' idx=0 pct=0 elapsed=0 elapsed_fmt=""
+    local spin='|/-\' idx=0 pct=0 elapsed=0 elapsed_fmt="" overrun_notice=0
     while kill -0 "$pid" >/dev/null 2>&1; do
-      pct="$(blockcheck2_progress_percent "$log_file")"
       elapsed=$(( $(date +%s) - start_ts ))
+      pct="$(blockcheck2_progress_percent "$elapsed")"
       elapsed_fmt="$(blockcheck2_format_elapsed "$elapsed")"
       printf "\r${yellow}blockcheck2: %3s%% %s elapsed %s${plain}" "$pct" "${spin:$idx:1}" "$elapsed_fmt"
+      if [ "$pct" -ge 100 ] && [ "$overrun_notice" -eq 0 ]; then
+        echo -e "\n${yellow}Скрипт выполняется дольше обычного. Это ожидаемо. Дождитесь завершения работы скрипта.${plain}"
+        echo -e "\n${yellow}И вообще 146% - не предел${plain}"
+        overrun_notice=1
+      fi
       idx=$(( (idx + 1) % 4 ))
       sleep 1
     done
@@ -195,32 +192,11 @@ blockcheck2_run_summary() {
   if [ ! -s "$summary_file" ]; then
     echo -e "${red}SUMMARY не найден. Лог сохранен: $log_file${plain}"
   else
-    cp "$summary_file" "$upload_file"
     cp "$summary_file" "$summary_public"
-    echo -e "${green}SUMMARY сохранен: $upload_file${plain}"
     echo -e "${green}SUMMARY сохранен для просмотра: $summary_public${plain}"
-    echo -e "${yellow}Отправить SUMMARY на Google Drive для помощи в разработке? 1 - Да, Enter - Нет${plain}"
-    read -r ans_upload
-    if [ "$ans_upload" = "1" ] || [ "$ans_upload" = "y" ] || [ "$ans_upload" = "Y" ]; then
-      upload_ok=1
-    fi
-  fi
-
-  if [ "$upload_ok" -eq 1 ] && [ -n "$BLOCKCHECK2_APPS_SCRIPT_URL" ] && [ -s "$upload_file" ]; then
-    echo -e "${yellow}Отправка SUMMARY в Google Drive...${plain}"
-    if curl -sS --max-time 30 \
-      -F "file=@${upload_file}" \
-      -F "filename=$(basename "$upload_file")" \
-      -F "secret=${BLOCKCHECK2_SHARED_SECRET}" \
-      "$BLOCKCHECK2_APPS_SCRIPT_URL" >/dev/null; then
-      echo -e "${green}SUMMARY отправлен в Google Drive.${plain}"
-    else
-      echo -e "${red}Ошибка отправки в Google Drive. Проверьте URL и доступ.${plain}"
-    fi
-  elif [ -s "$upload_file" ]; then
-    echo -e "${yellow}Отправка пропущена по выбору пользователя.${plain}"
-  else
-    echo -e "${yellow}Отправка пропущена: не задан BLOCKCHECK2_APPS_SCRIPT_URL или файл пуст.${plain}"
+    echo -e "${yellow}Пожалуйста, отправьте этот файл в чат z4r: $summary_public${plain}"
+    echo -e "${yellow}Нажмите Enter чтобы продолжить${plain}"
+    read -r
   fi
 
   if [ "$was_running" -eq 1 ]; then
@@ -232,25 +208,13 @@ blockcheck2_run_summary() {
 }
 
 blockcheck2_progress_percent() {
-  local log_file="$1"
-  [ -s "$log_file" ] || { echo 0; return; }
-  if grep -q '^\* SUMMARY' "$log_file"; then
-    echo 100
+  local elapsed="$1"
+  local total=$((2 * 60 * 60))
+  if [ "$elapsed" -le 0 ]; then
+    echo 0
     return
   fi
-  if grep -q '\* checking system' "$log_file"; then
-    echo 5
-  elif grep -q '\* checking prerequisites' "$log_file"; then
-    echo 10
-  elif grep -q '\* checking DNS' "$log_file"; then
-    echo 20
-  elif grep -q '\* .* ipv' "$log_file"; then
-    echo 50
-  elif grep -q 'preparing .* redirection' "$log_file"; then
-    echo 70
-  else
-    echo 1
-  fi
+  echo $(( (elapsed * 100) / total ))
 }
 
 blockcheck2_format_elapsed() {
@@ -630,7 +594,7 @@ Enter (без цифр) - переустановка/обновление zapret
 01. Проверить доступность сервисов (Тест не точен)
 1. Сменить стратегии или добавить домен в хост-лист. Текущие: '"${plain}"'[ '"${strategies_status}"' ]'"${yellow}"'
 2. Стоп/пере(запуск) zapret2 (сейчас: '"$(pidof nfqws2 >/dev/null && echo "${green}Запущен${yellow}" || echo "${red}Остановлен${yellow}")"')
-3. Запуск blockcheck2 и отправка SUMMARY в Google Drive
+3. Запуск blockcheck2 и сохранение SUMMARY
 4. Удалить zapret2
 5. Обновить стратегии, сбросить листы подбора стратегий и исключений (есть бэкап)
 6. Исключить домен из zapret2 обработки
