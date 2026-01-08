@@ -701,8 +701,10 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "1")
-    echo "Режим подбора других стратегий"
-    strategies_submenu     # strategies_submenu сам в цикле и выходит через return
+    echo -e "${yellow}Временно не работает${plain}"
+    # echo "Режим подбора других стратегий"
+    # strategies_submenu     # strategies_submenu сам в цикле и выходит через return
+    pause_enter
     ;;
 
   "2")
@@ -755,7 +757,8 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "8")
-    menu_action_toggle_bolvan_ports
+    echo -e "${yellow}Временно не работает${plain}"
+    # menu_action_toggle_bolvan_ports
     pause_enter
     ;;
 
@@ -765,7 +768,9 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "10")
-    menu_action_toggle_udp_range
+    echo -e "${yellow}Временно не работает${plain}"
+    # pause_entermenu_action_toggle_udp_range
+    
     pause_enter
     ;;
 
