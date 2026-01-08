@@ -86,8 +86,8 @@ NFQWS2_OPT="
 
 # общий фильтр для всех стратегий
 
---blob=maxru:@/opt/zapret/files/fake/tls_clienthello_max_ru.bin
---blob=google_www:@/opt/zapret/files/fake/tls_clienthello_www_google_com.bin
+--blob=maxru:@/opt/zapret2/files/fake/tls_clienthello_max_ru.bin
+--blob=google_www:@/opt/zapret2/files/fake/tls_clienthello_www_google_com.bin
 --payload=tls_client_hello,http_req,http_reply 
 
 --lua-desync=multidisorder:pos=1,midsld:strategy=1
@@ -155,8 +155,8 @@ NFQWS2_OPT="
 
 --filter-udp=443 --hostlist=/opt/zapret2/extra_strats/UDP_YT_list.txt  --in-range=-s5556 --lua-desync=circular:fails=6:retrans=4 --in-range=x 
 --payload=quic_initial
---blob=quic_google:@/opt/zapret/files/fake/quic_initial_www_google_com.bin
---blob=quic5:@/opt/zapret/files/fake/quic_5.bin
+--blob=quic_google:@/opt/zapret2/files/fake/quic_initial_www_google_com.bin
+--blob=quic5:@/opt/zapret2/files/fake/quic_5.bin
 
 --lua-desync=fake:blob=quic5:repeats=3:strategy=1
 --lua-desync=udplen:increment=4:strategy=2 --lua-desync=fake:blob=quic5:repeats=2:strategy=2
@@ -171,14 +171,13 @@ NFQWS2_OPT="
 --filter-udp=50000-50099,1400,3478-3481,5349,19294-19344 
 --filter-l7=discord,stun 
 --payload=quic_initial 
---blob=fake_quic_www_google:/opt/zapret/files/fake/quic_initial_www_google_com.bin 
+--blob=fake_quic_www_google:/opt/zapret2/files/fake/quic_initial_www_google_com.bin 
 --lua-desync=fake:udp:blob=fake_quic_www_google:repeats=2
 --new
 
 --skip --filter-udp=1026-65531
---blob=fake_quic_unknown_udp:/opt/zapret/files/fake/quic_initial_www_google_com.bin
+--blob=fake_quic_unknown_udp:/opt/zapret2/files/fake/quic_initial_www_google_com.bin
 --lua-desync=fake:udp:blob=fake_quic_unknown_udp:ip_autottl=2:repeats=10
-
 "
 
 
