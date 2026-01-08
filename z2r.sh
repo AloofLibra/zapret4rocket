@@ -129,6 +129,7 @@ blockcheck2_run_summary() {
   local provider_file="/opt/zapret2/extra_strats/cache/provider.txt"
   local provider_label="" provider_sanitized="" ts=""
   local log_file="" summary_file="" upload_file="" summary_public=""
+  local uuid_suffix=""
   local was_running=0 rc=0
   local pid=0 start_ts=0
 
@@ -153,9 +154,10 @@ blockcheck2_run_summary() {
   provider_sanitized="$(echo "$provider_label" | tr -cd 'a-zA-Z0-9 ._-' | tr ' ' '_' | cut -c1-60)"
   [ -z "$provider_sanitized" ] && provider_sanitized="Unknown"
 
-  log_file="$log_dir/blockcheck2_${provider_sanitized}_${ts}.log"
-  summary_file="$log_dir/blockcheck2_${provider_sanitized}_${ts}.summary"
-  upload_file="$log_dir/blockcheck2_${provider_sanitized}_${ts}.txt"
+  uuid_suffix="$(blockcheck2_get_uuid)"
+  log_file="$log_dir/blockcheck2_${provider_sanitized}_${ts}_${uuid_suffix}.log"
+  summary_file="$log_dir/blockcheck2_${provider_sanitized}_${ts}_${uuid_suffix}.summary"
+  upload_file="$log_dir/blockcheck2_${provider_sanitized}_${ts}_${uuid_suffix}.txt"
   summary_public="/opt/zapret2/blockcheck2_summary.txt"
 
   echo -e "${yellow}Запускаю blockcheck2 (BATCH=1)...${plain}"
@@ -257,6 +259,27 @@ blockcheck2_format_elapsed() {
   else
     printf "%ss" "$total"
   fi
+}
+
+blockcheck2_get_uuid() {
+  local tel_uuid=""
+  if [ -n "$TELEMETRY_CFG" ] && [ -f "$TELEMETRY_CFG" ]; then
+    # shellcheck disable=SC1090
+    source "$TELEMETRY_CFG"
+  fi
+  if [ -z "$tel_uuid" ]; then
+    if [ -f /proc/sys/kernel/random/uuid ]; then
+      tel_uuid="$(cut -c1-8 /proc/sys/kernel/random/uuid)"
+    else
+      tel_uuid="$(date +%s%N | md5sum | head -c 8)"
+    fi
+    if [ -n "$TELEMETRY_CFG" ]; then
+      mkdir -p "$(dirname "$TELEMETRY_CFG")"
+      echo "tel_enabled=${tel_enabled:-0}" > "$TELEMETRY_CFG"
+      echo "tel_uuid=$tel_uuid" >> "$TELEMETRY_CFG"
+    fi
+  fi
+  echo "$tel_uuid"
 }
 
 #Создаём папки и забираем файлы папок lists, fake, extra_strats, копируем конфиг, скрипты для войсов DS, WA, TG
@@ -463,7 +486,7 @@ get_panel() {
 
 #webssh ttyd
 ttyd_webssh() {
- echo -e $'\033[33mВведите логин для доступа к zeefeer через браузер (0 - отказ от логина через web в z4r и переход на логин в ssh (может помочь в safari). Enter - пустой логин, \033[31mно не рекомендуется, панель может быть доступна из интернета!)\033[0m'
+ echo -e $'\033[33mВведите логин для доступа к zeefeer через браузер (0 - отказ от логина через web в z2r и переход на логин в ssh (может помочь в safari). Enter - пустой логин, \033[31mно не рекомендуется, панель может быть доступна из интернета!)\033[0m'
  read -re -p '' ttyd_login
  echo -e "${yellow}Если вы открыли пункт через браузер - вас выкинет. Используйте SSH для установки${plain}"
  
@@ -573,7 +596,7 @@ get_menu() {
     clear
     echo -e "${cyan}========================================${plain}"
     echo -e "${Fcyan}            zeefeer4rocket             ${plain}"
-    echo -e "${Fgreen}         Z2R - zapret2 Manager          ${plain}"
+    echo -e "${Fgreen}         z2r - zapret2 Manager          ${plain}"
     echo -e "${cyan}========================================${plain}"
     echo ""
     
