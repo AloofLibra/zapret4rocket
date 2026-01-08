@@ -130,6 +130,7 @@ blockcheck2_run_summary() {
   local provider_label="" provider_sanitized="" ts=""
   local log_file="" summary_file="" upload_file="" summary_public=""
   local uuid_suffix=""
+  local upload_ok=0
   local was_running=0 rc=0
   local pid=0 start_ts=0
 
@@ -198,9 +199,14 @@ blockcheck2_run_summary() {
     cp "$summary_file" "$summary_public"
     echo -e "${green}SUMMARY сохранен: $upload_file${plain}"
     echo -e "${green}SUMMARY сохранен для просмотра: $summary_public${plain}"
+    echo -e "${yellow}Отправить SUMMARY на Google Drive для помощи в разработке? 1 - Да, Enter - Нет${plain}"
+    read -r ans_upload
+    if [ "$ans_upload" = "1" ] || [ "$ans_upload" = "y" ] || [ "$ans_upload" = "Y" ]; then
+      upload_ok=1
+    fi
   fi
 
-  if [ -n "$BLOCKCHECK2_APPS_SCRIPT_URL" ] && [ -s "$upload_file" ]; then
+  if [ "$upload_ok" -eq 1 ] && [ -n "$BLOCKCHECK2_APPS_SCRIPT_URL" ] && [ -s "$upload_file" ]; then
     echo -e "${yellow}Отправка SUMMARY в Google Drive...${plain}"
     if curl -sS --max-time 30 \
       -F "file=@${upload_file}" \
@@ -211,6 +217,8 @@ blockcheck2_run_summary() {
     else
       echo -e "${red}Ошибка отправки в Google Drive. Проверьте URL и доступ.${plain}"
     fi
+  elif [ -s "$upload_file" ]; then
+    echo -e "${yellow}Отправка пропущена по выбору пользователя.${plain}"
   else
     echo -e "${yellow}Отправка пропущена: не задан BLOCKCHECK2_APPS_SCRIPT_URL или файл пуст.${plain}"
   fi
