@@ -388,7 +388,7 @@ install_zapret_reboot() {
  "$ZAPRET2_INIT" restart
  if pidof nfqws2 >/dev/null; then
   check_access_list
-  echo -e "\033[32mzapret2 перезапущен и полностью установлен\n\033[33mЕсли требуется меню (например не работают какие-то ресурсы) - введите скрипт ещё раз или просто напишите "z4r" в терминале. Саппорт: tg: zee4r\033[0m"
+  echo -e "\033[32mzapret2 перезапущен и полностью установлен\n\033[33mЕсли требуется меню (например не работают какие-то ресурсы) - введите скрипт ещё раз или просто напишите "z2r" в терминале. Саппорт: tg: zee4r\033[0m"
  else
   echo -e "${yellow}zapret2 полностью установлен, но не обнаружен после запуска в исполняемых задачах через pidof\nСаппорт: tg: zee4r${plain}"
  fi
@@ -467,9 +467,9 @@ ttyd_webssh() {
  read -re -p '' ttyd_login
  echo -e "${yellow}Если вы открыли пункт через браузер - вас выкинет. Используйте SSH для установки${plain}"
  
- ttyd_login_have="-c "${ttyd_login}": bash z4r"
+ ttyd_login_have="-c "${ttyd_login}": bash z2r"
  if [[ "$ttyd_login" == "0" ]]; then
-	echo "Отключение логина в веб. Перевод с z4r на CLI логин."
+	echo "Отключение логина в веб. Перевод с z2r на CLI логин."
     ttyd_login_have="login"
  fi
  
@@ -573,7 +573,7 @@ get_menu() {
     clear
     echo -e "${cyan}========================================${plain}"
     echo -e "${Fcyan}            zeefeer4rocket             ${plain}"
-    echo -e "${Fgreen}         Z4R - zapret2 Manager          ${plain}"
+    echo -e "${Fgreen}         Z2R - zapret2 Manager          ${plain}"
     echo -e "${cyan}========================================${plain}"
     echo ""
     
