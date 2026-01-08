@@ -95,15 +95,79 @@ source "$SCRIPT_DIR/zapret2/z2r_lib/submenus.sh"
 #          menu_action_toggle_fwtype, menu_action_toggle_udp_range
 source "$SCRIPT_DIR/zapret2/z2r_lib/actions.sh" 
 
-# Определяем путь до init-скрипта zapret2 (OpenWRT vs остальные)
-if [ -f "/opt/zapret2/init.d/openwrt/zapret2" ]; then
-  ZAPRET2_INIT="/opt/zapret2/init.d/openwrt/zapret2"
-elif [ -f "/opt/zapret2/init.d/sysv/zapret2" ]; then
-  ZAPRET2_INIT="/opt/zapret2/init.d/sysv/zapret2"
-else
-  ZAPRET2_INIT="/opt/zapret2/init.d/sysv/zapret2"
-fi
-export ZAPRET2_INIT
+detect_os() {
+  if [[ -f /etc/os-release ]]; then
+    source /etc/os-release
+    release=$ID
+  elif [[ -f /usr/lib/os-release ]]; then
+    source /usr/lib/os-release
+    release=$ID
+  elif [[ -f /opt/etc/entware_release ]]; then
+    release="entware"
+  elif [[ -f /etc/entware_release ]]; then
+    release="entware"
+  else
+    echo "Не удалось определить ОС. Прекращение работы скрипта." >&2
+    exit 1
+  fi
+
+  if [[ "$release" == "entware" ]]; then
+    if [ -d /jffs ] || uname -a | grep -qi "Merlin"; then
+      hardware="merlin"
+    elif grep -Eqi "netcraze|keenetic" /proc/version; then
+      hardware="keenetic"
+    else
+      echo -e "${yellow}Железо не определено. Будем считать что это Keenetic. Если будут проблемы - пишите в саппорт.${plain}"
+      hardware="keenetic"
+    fi
+  fi
+
+  #По просьбе наших слушателей) Теперь netcraze официально детектится скриптом не как keenetic, а отдельно)
+  if grep -q "netcraze" "/bin/ndmc" 2>/dev/null; then
+    echo "OS: $release Netcraze"
+  else
+    echo "OS: $release $hardware"
+  fi
+
+  if [[ "$release" == "ubuntu" || "$release" == "debian" || "$release" == "endeavouros" || "$release" == "arch" ]]; then
+    OSystem="VPS"
+  elif [[ "$release" == "openwrt" || "$release" == "immortalwrt" || "$release" == "asuswrt" || "$release" == "x-wrt" || "$release" == "kwrt" || "$release" == "istoreos" ]]; then
+    OSystem="WRT"
+  elif [[ "$release" == "entware" || "$hardware" = "keenetic" ]]; then
+    OSystem="entware"
+  else
+    read -re -p $'\033[31mДля этой ОС нет подходящей функции. Или ОС определение выполнено некорректно.\033[33m Рекомендуется обратиться в чат поддержки
+Enter - выход
+1 - Плюнуть и продолжить как OpenWRT
+2 - Плюнуть и продолжить как entware
+3 - Плюнуть и продолжить как VPS\033[0m\n' os_answer
+    case "$os_answer" in
+    "1")
+      OSystem="WRT"
+    ;;
+    "2")
+      OSystem="entware"
+    ;;
+    "3")
+      OSystem="VPS"
+    ;;
+    *)
+      echo "Выбран выход"
+      exit 0
+    ;;
+    esac
+  fi
+}
+
+
+set_zapret2_init() {
+  if [ "$OSystem" = "WRT" ] && [ -f "/opt/zapret2/init.d/openwrt/zapret2" ]; then
+    ZAPRET2_INIT="/opt/zapret2/init.d/openwrt/zapret2"
+  else
+    ZAPRET2_INIT="/opt/zapret2/init.d/sysv/zapret2"
+  fi
+  export ZAPRET2_INIT
+}
 
 change_user() {
    if /opt/zapret2/nfq2/nfqws2 --dry-run --user="nobody" 2>&1 | grep -q "queue"; then
@@ -742,68 +806,9 @@ esac
 
 #___Само выполнение скрипта начинается тут____
 
-#Проверка ОС
-if [[ -f /etc/os-release ]]; then
-    source /etc/os-release
-    release=$ID
-elif [[ -f /usr/lib/os-release ]]; then
-    source /usr/lib/os-release
-    release=$ID
-elif [[ -f /opt/etc/entware_release ]]; then
-    release="entware"
-elif [[ -f /etc/entware_release ]]; then
-    release="entware"
-else
-    echo "Не удалось определить ОС. Прекращение работы скрипта." >&2
-    exit 1
-fi
-if [[ "$release" == "entware" ]]; then
- if [ -d /jffs ] || uname -a | grep -qi "Merlin"; then
-    hardware="merlin"
- elif grep -Eqi "netcraze|keenetic" /proc/version; then
-   	hardware="keenetic"
- else
-  echo -e "${yellow}Железо не определено. Будем считать что это Keenetic. Если будут проблемы - пишите в саппорт.${plain}"
-  hardware="keenetic"
- fi
-fi
 
-#По просьбе наших слушателей) Теперь netcraze официально детектится скриптом не как keenetic, а отдельно)
-if grep -q "netcraze" "/bin/ndmc" 2>/dev/null; then
- echo "OS: $release Netcraze"
-else
- echo "OS: $release $hardware"
-fi
-
-#Запуск скрипта под нужную версию
-if [[ "$release" == "ubuntu" || "$release" == "debian" || "$release" == "endeavouros" || "$release" == "arch" ]]; then
-	OSystem="VPS"
-elif [[ "$release" == "openwrt" || "$release" == "immortalwrt" || "$release" == "asuswrt" || "$release" == "x-wrt" || "$release" == "kwrt" || "$release" == "istoreos" ]]; then
-	OSystem="WRT"
-elif [[ "$release" == "entware" || "$hardware" = "keenetic" ]]; then
-	OSystem="entware"
-else
-	read -re -p $'\033[31mДля этой ОС нет подходящей функции. Или ОС определение выполнено некорректно.\033[33m Рекомендуется обратиться в чат поддержки
-Enter - выход
-1 - Плюнуть и продолжить как OpenWRT
-2 - Плюнуть и продолжить как entware
-3 - Плюнуть и продолжить как VPS\033[0m\n' os_answer
-	case "$os_answer" in
-	"1")
-		OSystem="WRT"
-	;;
-	"2")
-		OSystem="entware"
-	;;
-	"3")
-		OSystem="VPS"
-	;;
-	*)
-		echo "Выбран выход"
-		exit 0
-	;;
-esac 
-fi
+detect_os
+set_zapret2_init
 
 #Инфа о времени обновления скрпта
 commit_date=$(curl -s --max-time 30 "https://api.github.com/repos/IndeecFOX/zapret4rocket/commits?path=z4r.sh&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4)
