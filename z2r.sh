@@ -128,7 +128,7 @@ blockcheck2_run_summary() {
   local log_dir="/opt/zapret2/extra_strats/cache/blockcheck2"
   local provider_file="/opt/zapret2/extra_strats/cache/provider.txt"
   local provider_label="" provider_sanitized="" ts=""
-  local log_file="" summary_file="" upload_file=""
+  local log_file="" summary_file="" upload_file="" summary_public=""
   local was_running=0 rc=0
   local pid=0 start_ts=0
 
@@ -156,22 +156,25 @@ blockcheck2_run_summary() {
   log_file="$log_dir/blockcheck2_${provider_sanitized}_${ts}.log"
   summary_file="$log_dir/blockcheck2_${provider_sanitized}_${ts}.summary"
   upload_file="$log_dir/blockcheck2_${provider_sanitized}_${ts}.txt"
+  summary_public="/opt/zapret2/blockcheck2_summary.txt"
 
   echo -e "${yellow}Запускаю blockcheck2 (BATCH=1)...${plain}"
   start_ts="$(date +%s)"
   BATCH=1 ZAPRET_BASE=/opt/zapret2 "$blockcheck_path" >"$log_file" 2>&1 &
   pid=$!
   if [ "$pid" -gt 0 ]; then
-    local spin='|/-\' idx=0 pct=0 elapsed=0
+    local spin='|/-\' idx=0 pct=0 elapsed=0 elapsed_fmt=""
     while kill -0 "$pid" >/dev/null 2>&1; do
       pct="$(blockcheck2_progress_percent "$log_file")"
       elapsed=$(( $(date +%s) - start_ts ))
-      printf "\r${yellow}blockcheck2: %3s%% %s elapsed %ss${plain}" "$pct" "${spin:$idx:1}" "$elapsed"
+      elapsed_fmt="$(blockcheck2_format_elapsed "$elapsed")"
+      printf "\r${yellow}blockcheck2: %3s%% %s elapsed %s${plain}" "$pct" "${spin:$idx:1}" "$elapsed_fmt"
       idx=$(( (idx + 1) % 4 ))
       sleep 1
     done
     wait "$pid" || rc=$?
-    printf "\r${yellow}blockcheck2: 100%% done (elapsed %ss)${plain}\n" "$(( $(date +%s) - start_ts ))"
+    elapsed_fmt="$(blockcheck2_format_elapsed "$(( $(date +%s) - start_ts ))")"
+    printf "\r${yellow}blockcheck2: 100%% done (elapsed %s)${plain}\n" "$elapsed_fmt"
   else
     echo -e "${red}Не удалось запустить blockcheck2.${plain}"
     rc=1
@@ -190,7 +193,9 @@ blockcheck2_run_summary() {
     echo -e "${red}SUMMARY не найден. Лог сохранен: $log_file${plain}"
   else
     cp "$summary_file" "$upload_file"
+    cp "$summary_file" "$summary_public"
     echo -e "${green}SUMMARY сохранен: $upload_file${plain}"
+    echo -e "${green}SUMMARY сохранен для просмотра: $summary_public${plain}"
   fi
 
   if [ -n "$BLOCKCHECK2_APPS_SCRIPT_URL" ] && [ -s "$upload_file" ]; then
@@ -235,6 +240,22 @@ blockcheck2_progress_percent() {
     echo 70
   else
     echo 1
+  fi
+}
+
+blockcheck2_format_elapsed() {
+  local total="$1" hours=0 mins=0 secs=0
+  if [ "$total" -ge 3600 ]; then
+    hours=$(( total / 3600 ))
+    mins=$(( (total % 3600) / 60 ))
+    secs=$(( total % 60 ))
+    printf "%dh%02dm%02ds" "$hours" "$mins" "$secs"
+  elif [ "$total" -ge 60 ]; then
+    mins=$(( total / 60 ))
+    secs=$(( total % 60 ))
+    printf "%dm%02ds" "$mins" "$secs"
+  else
+    printf "%ss" "$total"
   fi
 }
 
