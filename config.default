@@ -150,8 +150,14 @@ NFQWS2_OPT="
 --new
 
 --filter-tcp=80,443 --hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt
---payload=tls_client_hello
---lua-desync=fake:blob=0x00000000:tcp_seq=-3000:repeats=1 --lua-desync=fake:blob=fake_default_tls:tcp_seq=-3000:tls_mod=rnd,dupsid:repeats=1
+--out-range=-s34228 and 
+--in-range=-s5556 --lua-desync=circular 
+--in-range=x
+--payload=tls_client_hello 
+--lua-desync=fake:blob=maxru:tcp_seq=-3000:repeats=1:strategy=1 --lua-desync=fake:blob=fake_default_tls:tcp_seq=-3000:tls_mod=rnd,dupsid:repeats=1:strategy=1
+--lua-desync=fake:blob=maxru:tcp_seq=1:strategy=2
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:strategy=3
+
 --new
 
 --filter-udp=443 --hostlist=/opt/zapret2/extra_strats/UDP_YT_list.txt
