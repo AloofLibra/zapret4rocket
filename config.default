@@ -221,7 +221,7 @@ INIT_APPLY_FW=1
 # do not work with ipv4
 #DISABLE_IPV4=1
 # do not work with ipv6
-DISABLE_IPV6=1
+DISABLE_IPV6=0
 
 # drop icmp time exceeded messages for nfqws tampered connections
 # in POSTNAT mode this can interfere with default mtr/traceroute in tcp or udp mode. use source port not redirected to nfqws
