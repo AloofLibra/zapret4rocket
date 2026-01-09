@@ -219,7 +219,7 @@ blockcheck2_run_summary() {
 
   echo -e "${yellow}Запускаю blockcheck2 (BATCH=1)...${plain}"
   start_ts="$(date +%s)"
-  BATCH=1 ZAPRET_BASE=/opt/zapret2 "$blockcheck_path" >"$log_file" 2>&1 &
+  CURL_HTTPS_GET=1 BATCH=1 ZAPRET_BASE=/opt/zapret2 "$blockcheck_path" >"$log_file" 2>&1 &
   pid=$!
   if [ "$pid" -gt 0 ]; then
     local spin='|/-\' idx=0 pct=0 elapsed=0 elapsed_fmt="" overrun_notice=0
