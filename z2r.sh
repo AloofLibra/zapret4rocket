@@ -217,9 +217,16 @@ blockcheck2_run_summary() {
   summary_file="$log_dir/blockcheck2_${provider_sanitized}_${ts}_${uuid_suffix}.summary"
   summary_public="/opt/zapret2/blockcheck2_summary.txt"
 
+  local domains_override=""
+  read -re -p "Введите домен/URL для теста blockcheck2 (Enter - по умолчанию): " domains_override
+
   echo -e "${yellow}Запускаю blockcheck2 (BATCH=1)...${plain}"
   start_ts="$(date +%s)"
-  CURL_HTTPS_GET=1 BATCH=1 ZAPRET_BASE=/opt/zapret2 "$blockcheck_path" >"$log_file" 2>&1 &
+  if [ -n "$domains_override" ]; then
+    CURL_HTTPS_GET=1 BATCH=1 DOMAINS="$domains_override" ZAPRET_BASE=/opt/zapret2 "$blockcheck_path" >"$log_file" 2>&1 &
+  else
+    CURL_HTTPS_GET=1 BATCH=1 ZAPRET_BASE=/opt/zapret2 "$blockcheck_path" >"$log_file" 2>&1 &
+  fi
   pid=$!
   if [ "$pid" -gt 0 ]; then
     local spin='|/-\' idx=0 pct=0 elapsed=0 elapsed_fmt="" overrun_notice=0
