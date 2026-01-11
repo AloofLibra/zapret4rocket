@@ -169,6 +169,173 @@ set_zapret2_init() {
   export ZAPRET2_INIT
 }
 
+ORCH_DIR="/opt/zapret2/extra_strats/cache/orchestra"
+ORCH_SCRIPT="$ORCH_DIR/orchestrator.sh"
+ORCH_ENABLED_FLAG="$ORCH_DIR/enabled"
+ORCH_LUA_LOCKED="/opt/zapret2/lua/locked.lua"
+
+orchestra_install() {
+  mkdir -p "$ORCH_DIR"
+  if [ -f "$SCRIPT_DIR/orchestra/orchestrator.sh" ]; then
+    cp "$SCRIPT_DIR/orchestra/orchestrator.sh" "$ORCH_SCRIPT"
+    chmod +x "$ORCH_SCRIPT"
+  fi
+}
+
+orchestra_ensure_locked_lua() {
+  if [ ! -f "$ORCH_LUA_LOCKED" ]; then
+    cat > "$ORCH_LUA_LOCKED" <<'LUA'
+local LOCKED_PATH = "/opt/zapret2/extra_strats/cache/orchestra/locked.tsv"
+local last_load = 0
+local cache_ttl = 2
+local LOCKED_TLS = {}
+local LOCKED_HTTP = {}
+local LOCKED_UDP = {}
+
+local function load_locked_tables()
+  local now = os.time()
+  if now and (now - last_load) < cache_ttl then return end
+  last_load = now or 0
+  LOCKED_TLS = {}
+  LOCKED_HTTP = {}
+  LOCKED_UDP = {}
+
+  local f = io.open(LOCKED_PATH, "r")
+  if not f then return end
+  for line in f:lines() do
+    if line ~= "" then
+      local p1, p2, p3 = string.match(line, "^([^\t]+)\t([^\t]+)\t([^\t]+)$")
+      if p1 then
+        local profile = string.lower(p1)
+        local proto = string.lower(p2)
+        local strat = tonumber(p3)
+        if strat then
+          if proto == "http" then LOCKED_HTTP[profile] = strat
+          elseif proto == "udp" then LOCKED_UDP[profile] = strat
+          else LOCKED_TLS[profile] = strat end
+        end
+      else
+        local p, s = string.match(line, "^([^\t]+)\t([^\t]+)$")
+        if p and s then
+          local strat = tonumber(s)
+          if strat then LOCKED_TLS[string.lower(p)] = strat end
+        end
+      end
+    end
+  end
+  f:close()
+end
+
+function locked_strategy_for_profile(profile, proto)
+  if not profile then return nil end
+  profile = string.lower(tostring(profile))
+  proto = string.lower(tostring(proto or "tls"))
+  load_locked_tables()
+  if proto == "http" then return LOCKED_HTTP[profile] end
+  if proto == "udp" then return LOCKED_UDP[profile] end
+  return LOCKED_TLS[profile]
+end
+
+function desync_profile_key(desync)
+  return "default"
+end
+
+function circular_locked(ctx, desync)
+  return circular(ctx, desync)
+end
+LUA
+  fi
+}
+
+orchestra_start() {
+  orchestra_install
+  orchestra_ensure_locked_lua
+  touch "$ORCH_ENABLED_FLAG"
+  "$ZAPRET2_INIT" restart
+  if [ -x "$ORCH_SCRIPT" ]; then
+    "$ORCH_SCRIPT" start
+  fi
+}
+
+orchestra_stop() {
+  if [ -x "$ORCH_SCRIPT" ]; then
+    "$ORCH_SCRIPT" stop
+  fi
+  rm -f "$ORCH_ENABLED_FLAG"
+  "$ZAPRET2_INIT" restart
+}
+
+orchestra_status_text() {
+  if [ -f "$ORCH_ENABLED_FLAG" ] && [ -x "$ORCH_SCRIPT" ] && "$ORCH_SCRIPT" status >/dev/null 2>&1; then
+    echo "Включен"
+  else
+    echo "Выключен"
+  fi
+}
+
+orchestra_profile_lock_menu() {
+  local lock_file="$ORCH_DIR/locked.tsv"
+  local profile="" proto="" strat="" tmp=""
+
+  mkdir -p "$ORCH_DIR"
+  touch "$lock_file"
+
+  clear
+  echo -e "${cyan}--- Ручная фиксация стратегии профиля ---${plain}"
+  if [ -s "$lock_file" ]; then
+    echo "Текущие фиксации (profile proto strategy):"
+    awk 'BEGIN{FS="\t"}{
+      if (NF==2) printf "%s tls %s\n", $1, $2;
+      else if (NF>=3) printf "%s %s %s\n", $1, $2, $3;
+    }' "$lock_file"
+  else
+    echo "Фиксаций нет."
+  fi
+  echo ""
+
+  read -re -p "Профиль (как в логах desync profile, Enter - выход): " profile
+  [ -z "$profile" ] && return
+
+  read -re -p "Протокол tls/http/udp (Enter - tls): " proto
+  [ -z "$proto" ] && proto="tls"
+  case "$proto" in
+    tls|http|udp) ;;
+    *)
+      echo "Неизвестный протокол, ставлю tls."
+      proto="tls"
+      ;;
+  esac
+
+  read -re -p "Стратегия (1..N, 0 - снять фиксацию): " strat
+  if ! echo "$strat" | grep -Eq '^[0-9]+$'; then
+    echo "Неверный номер стратегии."
+    pause_enter
+    return
+  fi
+
+  tmp="${lock_file}.tmp"
+  if [ "$strat" -eq 0 ]; then
+    awk -v pr="$profile" -v p="$proto" 'BEGIN{FS=OFS="\t"}{
+      if ($1==pr && (($2==p) || (NF==2 && p=="tls"))) next
+      print
+    }' "$lock_file" > "$tmp" && mv "$tmp" "$lock_file"
+    echo "Фиксация снята: $profile $proto"
+  else
+    awk -v pr="$profile" -v p="$proto" -v s="$strat" 'BEGIN{FS=OFS="\t"}{
+      if ($1==pr && (($2==p) || (NF==2 && p=="tls"))) {print pr,p,s; found=1; next}
+      print
+    } END{
+      if (!found) print pr,p,s
+    }' "$lock_file" > "$tmp" && mv "$tmp" "$lock_file"
+    echo "Фиксация установлена: $profile $proto стратегия $strat"
+  fi
+
+  if [ -x "$ORCH_SCRIPT" ]; then
+    "$ORCH_SCRIPT" sync
+  fi
+  pause_enter
+}
+
 change_user() {
    if /opt/zapret2/nfq2/nfqws2 --dry-run --user="nobody" 2>&1 | grep -q "queue"; then
     echo "WS_USER=nobody"
@@ -632,7 +799,7 @@ get_menu() {
     update_recommendations  
   while true; do
   	local strategies_status
-    strategies_status=$(get_current_strategies_info)
+    strategies_status=$(get_orchestra_locks_info)
 	TITLE_MENU_LINE=""
     if [[ -s "$PREMIUM_TITLE_FILE" ]]; then
       TITLE_MENU_LINE="\n${pink}Титул:${plain} $(cat "$PREMIUM_TITLE_FILE")${yellow}\n"
@@ -664,7 +831,7 @@ get_menu() {
 Enter (без цифр) - переустановка/обновление zapret2
 0. Выход
 01. Проверить доступность сервисов (Тест не точен)
-1. Сменить стратегии или добавить домен в хост-лист. Текущие: '"${plain}"'[ '"${strategies_status}"' ]'"${yellow}"'
+1. Фиксация стратегии профиля (оркестратор). Текущие: '"${plain}"'[ '"${strategies_status}"' ]'"${yellow}"'
 2. Стоп/пере(запуск) zapret2 (сейчас: '"$(pidof nfqws2 >/dev/null && echo "${green}Запущен${yellow}" || echo "${red}Остановлен${yellow}")"')
 3. Запуск blockcheck2 и сохранение SUMMARY
 4. Удалить zapret2
@@ -708,18 +875,17 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "1")
-    echo -e "${yellow}Временно не работает${plain}"
-    # echo "Режим подбора других стратегий"
-    # strategies_submenu     # strategies_submenu сам в цикле и выходит через return
-    pause_enter
+    strategies_submenu
     ;;
 
   "2")
     if pidof nfqws2 >/dev/null; then
       "$ZAPRET2_INIT" stop
+      orchestra_stop
       echo -e "${green}Выполнена команда остановки zapret2${plain}"
     else
       "$ZAPRET2_INIT" restart
+      orchestra_start
       echo -e "${green}Выполнена команда перезапуска zapret2${plain}"
     fi
     pause_enter
@@ -798,6 +964,7 @@ Enter (без цифр) - переустановка/обновление zapret
     provider_submenu      # сабменю само в цикле и выходит через return
     ;;
 
+
   "777")
    echo -e "${green}Специальный zeefeer premium для Valery ProD, avg97, Xoz, GeGunT, blagodarenya, mikhyan, andric62, Whoze, Necronicle, Andrei_5288515371, Nomand, Dina_turat, Nergalss, Александра, АлександраП, vecheromholodno, ЕвгенияГ, Dyadyabo, skuwakin, izzzgoy, Grigaraz, Reconnaissance, comandante1928, rudnev2028, umad, rutakote, railwayfx, vtokarev1604, Grigaraz, a40letbezurojaya и subzeero452 активирован. Наверное. Так же благодарю поддержавших проект hey_enote, VssA, vladdrazz, Alexey_Tob, Bor1sBr1tva, Azamatstd, iMLT, Qu3Bee, SasayKudasay1, alexander_novikoff, MarsKVV, porfenon123, bobrishe_dazzle, kotov38, Levonkas, DA00001, trin4ik, geodomin, I_ZNA_I, CMyTHblN PacKoJlbHNK и анонимов${plain}"
    zefeer_premium_777
@@ -841,7 +1008,15 @@ if [[ -z "$(curl -s --max-time 10 "https://raw.githubusercontent.com/test")" ]];
     echo -e "${red}Не был получен доступ к raw.githubusercontent.com (таймаут 10 сек). Возможны проблемы при установке.${plain}"
 	if [ "$hardware" = "keenetic" ]; then
 		echo "Добавляем ip с от DNS 1.1.1.1 к raw.githubusercontent.com и пытаемся снова"
-		ndmc -c "ip host raw.githubusercontent.com $(nslookup raw.githubusercontent.com 1.1.1.1 | sed -n 's/^Address [0-9]*: \([0-9.]*\).*/\1/p' | tail -n1)"
+		raw_ip="$(nslookup raw.githubusercontent.com 1.1.1.1 | awk '
+			/^Name: / {found=1; next}
+			found && /^Address [0-9]+: / {print $3}
+		' | tail -n1)"
+		if [ -n "$raw_ip" ]; then
+			ndmc -c "ip host raw.githubusercontent.com $raw_ip"
+		else
+			echo "Не удалось получить IP для raw.githubusercontent.com (nslookup пуст/ошибка). Пропуск ip host."
+		fi
 	fi
 fi
 
