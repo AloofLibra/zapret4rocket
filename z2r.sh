@@ -251,7 +251,6 @@ orchestra_start() {
   orchestra_install
   orchestra_ensure_locked_lua
   touch "$ORCH_ENABLED_FLAG"
-  "$ZAPRET2_INIT" restart
   if [ -x "$ORCH_SCRIPT" ]; then
     "$ORCH_SCRIPT" start
   fi
@@ -262,15 +261,23 @@ orchestra_stop() {
     "$ORCH_SCRIPT" stop
   fi
   rm -f "$ORCH_ENABLED_FLAG"
-  "$ZAPRET2_INIT" restart
 }
 
 orchestra_status_text() {
-  if [ -f "$ORCH_ENABLED_FLAG" ] && [ -x "$ORCH_SCRIPT" ] && "$ORCH_SCRIPT" status >/dev/null 2>&1; then
-    echo "Включен"
-  else
-    echo "Выключен"
+  if [ -x "$ORCH_SCRIPT" ]; then
+    if command -v pgrep >/dev/null 2>&1; then
+      if pgrep -f "$ORCH_SCRIPT run" >/dev/null 2>&1; then
+        echo "Включен"
+        return
+      fi
+    elif pidof sh >/dev/null 2>&1; then
+      if ps w | grep -F "$ORCH_SCRIPT run" | grep -v grep >/dev/null 2>&1; then
+        echo "Включен"
+        return
+      fi
+    fi
   fi
+  echo "Выключен"
 }
 
 orchestra_profile_lock_menu() {
@@ -832,7 +839,7 @@ Enter (без цифр) - переустановка/обновление zapret
 0. Выход
 01. Проверить доступность сервисов (Тест не точен)
 1. Фиксация стратегии профиля (оркестратор). Текущие: '"${plain}"'[ '"${strategies_status}"' ]'"${yellow}"'
-2. Стоп/пере(запуск) zapret2 (сейчас: '"$(pidof nfqws2 >/dev/null && echo "${green}Запущен${yellow}" || echo "${red}Остановлен${yellow}")"')
+2. Стоп/пере(запуск) zapret2 (сейчас: '"$(pidof nfqws2 >/dev/null && echo "${green}Запущен${yellow}" || echo "${red}Остановлен${yellow}")"' | оркестратор: '"${plain}"'['"$(orchestra_status_text)"']'"${yellow}"')
 3. Запуск blockcheck2 и сохранение SUMMARY
 4. Удалить zapret2
 5. Обновить стратегии, сбросить листы подбора стратегий и исключений (есть бэкап)
