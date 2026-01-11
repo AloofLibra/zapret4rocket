@@ -5,35 +5,35 @@
 strategies_submenu() {
   while true; do
     local strategies_status
-    strategies_status=$(get_current_strategies_info)
+    strategies_status=$(get_orchestra_locks_info)
     clear
 
     echo -e "${cyan}--- Управление стратегиями ---${plain}"
-    echo -e "${yellow}Подобрать стратегию? (1-5 для подбора, 0 или Enter для отмены)${plain}"
+    echo -e "${yellow}Выбор стратегии профиля (1-4, 0 или Enter для выхода)${plain}"
     echo -e "  Текущие стратегии [${strategies_status}]"
     echo -e 
 
-    submenu_item "	1" "YouTube с видеопотоком (UDP QUIC)." "8 вариантов"
-    submenu_item "	2" "YouTube (TCP. Интерфейс)." "17 вариантов"
-    submenu_item "	3" "YouTube (TCP. Видеопоток/GV домен)." "17 вариантов"
-    submenu_item "	4" "RKN (Популярные блокированные сайты. Дискорд в т.ч.)." "17 вариантов"
-    submenu_item "	5" "Отдельный домен." "17 вариантов"
+    submenu_item "	1" "Профиль 1: TCP 80/443 (основной список)" "tls+http"
+    submenu_item "	2" "Профиль 2: TCP 80/443 (Discord)" "tls"
+    submenu_item "	3" "Профиль 3: UDP 443 (YouTube QUIC)" "udp"
+    submenu_item "	4" "Профиль 4: UDP (voice/discord/stun)" "udp"
     submenu_item "	0" "Назад"
     echo ""
 
     read -re -p "Ваш выбор: " ans
 
     case "$ans" in
-      "1"|"2"|"3"|"4")
-        Strats_Tryer "$ans"
-        pause_enter
+      "1")
+        orch_profile_try "1" "Профиль 1: TCP 80/443 (основной список)" "tls http" "https://www.youtube.com/"
         ;;
-      "5")
-        local user_domain=""
-        read -re -p "Введите домен (например mydomain.com) или Enter для выхода: " user_domain
-        [ -z "$user_domain" ] && continue
-        Strats_Tryer "$user_domain"
-        pause_enter
+      "2")
+        orch_profile_try "2" "Профиль 2: TCP 80/443 (Discord)" "tls" "https://discord.com/"
+        ;;
+      "3")
+        orch_profile_try "3" "Профиль 3: UDP 443 (YouTube QUIC)" "udp" "https://www.youtube.com/"
+        ;;
+      "4")
+        orch_profile_try "4" "Профиль 4: UDP (voice/discord/stun)" "udp" "https://discord.com/"
         ;;
       "0"|"")
         return
