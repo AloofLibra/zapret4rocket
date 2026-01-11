@@ -178,6 +178,7 @@ kill_existing_runs() {
     kill "$(cat "$PID_FILE" 2>/dev/null)" 2>/dev/null || true
     rm -f "$PID_FILE"
   fi
+  rm -rf "$RUN_LOCK_DIR"
 
   if command -v pgrep >/dev/null 2>&1; then
     pgrep -f "$0 run" | while IFS= read -r pid; do
@@ -233,14 +234,29 @@ log_fail() {
     "${reason:-fail}" >> "$FAIL_FILE"
 }
 
+clear_stale_lock() {
+  if [ -d "$RUN_LOCK_DIR" ]; then
+    lock_pid=""
+    if [ -f "$RUN_LOCK_DIR/pid" ]; then
+      lock_pid="$(cat "$RUN_LOCK_DIR/pid" 2>/dev/null || true)"
+    fi
+    if [ -z "$lock_pid" ] || ! kill -0 "$lock_pid" 2>/dev/null; then
+      rm -rf "$RUN_LOCK_DIR"
+    fi
+  fi
+}
+
 run_loop() {
   ensure_files
   write_locked_lua
   log "orchestrator: start"
 
   if ! mkdir "$RUN_LOCK_DIR" 2>/dev/null; then
-    log "orchestrator: already running (lock held)"
-    exit 0
+    clear_stale_lock
+    if ! mkdir "$RUN_LOCK_DIR" 2>/dev/null; then
+      log "orchestrator: already running (lock held)"
+      exit 0
+    fi
   fi
   echo $$ > "$RUN_LOCK_DIR/pid"
   trap 'rm -rf "$RUN_LOCK_DIR"' EXIT INT TERM
