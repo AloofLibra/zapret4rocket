@@ -86,7 +86,7 @@ NFQWS2_OPT="
 --payload=tls_client_hello,http_req,http_reply 
 --lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 and 
---in-range=-s5556 --lua-desync=circular_locked:retrans=2:maxseq=16384:inseq=2048
+--in-range=-s5556 --lua-desync=circular_locked:key=1:retrans=2:maxseq=16384:inseq=2048
 --debug=syslog 
 # общий фильтр для всех стратегий
 
@@ -95,11 +95,8 @@ NFQWS2_OPT="
 
 # 1. TLS‑цепочка (Google+maxru и прочий fake TLS)
 --payload=tls_client_hello,http_req
---lua-desync=multidisorder:pos=1,midsld:strategy=1
---lua-desync=fakedsplit:pos=7,sld+1:nofake1:strategy=1
---lua-desync=multidisorder:pos=1:strategy=1
---lua-desync=pktmod:tcp_ack=-66000:tcp_ts_up:strategy=1
---lua-desync=fake:blob=maxru:tls_mod=none:repeats=6:tcp_ts_up:strategy=2
+--lua-desync=argdebug:strategy=1
+--lua-desync=argdebug:strategy=2
 --lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-1000:tcp_md5:repeats=4:strategy=3
 --lua-desync=fake:blob=google_www:tls_mod=none:repeats=6:tcp_ts_up:tcp_ack_inc=2:strategy=4
 --lua-desync=fake:blob=google_www:tls_mod=rnd,dupsid,sni=www.google.com:repeats=8:tcp_ts_up:tcp_ack_inc=2:strategy=5
@@ -136,7 +133,7 @@ NFQWS2_OPT="
 
 --filter-tcp=80,443 --hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt
 --out-range=-s34228 and 
---in-range=-s5556 --lua-desync=circular_locked 
+--in-range=-s5556 --lua-desync=circular_locked:key=2 
 --in-range=x
 --payload=tls_client_hello 
 --lua-desync=fake:blob=maxru:tcp_seq=-3000:repeats=1:strategy=1 --lua-desync=fake:blob=fake_default_tls:tcp_seq=-3000:tls_mod=rnd,dupsid:repeats=1:strategy=1
@@ -147,7 +144,7 @@ NFQWS2_OPT="
 
 --filter-udp=443 --hostlist=/opt/zapret2/extra_strats/UDP_YT_list.txt
 --out-range=-s34228 and 
---in-range=-s5556 --lua-desync=circular_locked 
+--in-range=-s5556 --lua-desync=circular_locked:key=3 
 --in-range=x
 --payload=quic_initial
 --blob=quic_google:@/opt/zapret2/files/fake/quic_initial_www_google_com.bin
