@@ -8,7 +8,7 @@
 WS_USER=nobody
 
 # override firewall type : iptables,nftables,ipfw
-FWTYPE=iptables
+FWTYPE=nftables
 # nftables only : set this to 0 to use pre-nat mode. default is post-nat.
 # pre-nat mode disables some bypass techniques for forwarded traffic but allows to see client IP addresses in debug log
 #POSTNAT=0
@@ -84,24 +84,23 @@ NFQWS2_OPT="
 --qnum 300 --filter-tcp=80,443,2053,2083,2087,2096,8443 --filter-l7=http,tls 
 --hostlist=/opt/zapret2/extra_strats/TCP_RKN_list.txt --hostlist=/opt/zapret2/extra_strats/TCP_YT_list.txt 
 --payload=tls_client_hello,http_req,http_reply 
+--lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 and 
---in-range=-s5556 --lua-desync=circular 
---in-range=x
---debug=@/opt/zapret2/debug.log 
+--in-range=-s5556 --lua-desync=circular_locked:retrans=2:maxseq=16384:inseq=2048
+--debug=syslog 
 # общий фильтр для всех стратегий
 
 --blob=maxru:@/opt/zapret2/files/fake/tls_clienthello_max_ru.bin
 --blob=google_www:@/opt/zapret2/files/fake/tls_clienthello_www_google_com.bin
 
-
 # 1. TLS‑цепочка (Google+maxru и прочий fake TLS)
---payload=tls_client_hello
+--payload=tls_client_hello,http_req
 --lua-desync=multidisorder:pos=1,midsld:strategy=1
 --lua-desync=fakedsplit:pos=7,sld+1:nofake1:strategy=1
 --lua-desync=multidisorder:pos=1:strategy=1
 --lua-desync=pktmod:tcp_ack=-66000:tcp_ts_up:strategy=1
 --lua-desync=fake:blob=maxru:tls_mod=none:repeats=6:tcp_ts_up:strategy=2
---lua-desync=fake:blob=google_www:repeats=6:tcp_ts_up:tcp_ack_inc=10000000:strategy=3
+--lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-1000:tcp_md5:repeats=4:strategy=3
 --lua-desync=fake:blob=google_www:tls_mod=none:repeats=6:tcp_ts_up:tcp_ack_inc=2:strategy=4
 --lua-desync=fake:blob=google_www:tls_mod=rnd,dupsid,sni=www.google.com:repeats=8:tcp_ts_up:tcp_ack_inc=2:strategy=5
 --lua-desync=fake:blob=0x00000000:tcp_flags_set=SYN:repeats=1:strategy=6
@@ -119,7 +118,7 @@ NFQWS2_OPT="
 --lua-desync=fake:blob=google_www:tls_mod=rnd,dupsid,sni=www.google.com:repeats=11:tcp_ts_up:strategy=12
 --lua-desync=multidisorder:pos=1,midsld:strategy=12
 --lua-desync=fake:blob=maxru:repeats=8:tcp_ts_up:strategy=13
---lua-desync=multisplit:pos=1:seqovl=654:seqovl_pattern=maxru:strategy=13
+--lua-desync=multisplit:pos=1:seqovl=654:seqovl_pattern=maxru:strategy=14
 --lua-desync=fake:blob=0x00000000:tcp_ack=-66000:tcp_ts_up:repeats=1:strategy=15
 --lua-desync=fakeddisorder:pos=method+2,midsld:tcp_ack=-66000:tcp_ts_up:repeats=1:strategy=15
 --lua-desync=fake:blob=maxru:tls_mod=rnd,dupsid,sni=fonts.google.com:tcp_md5:ip_autottl=-1,2-12:strategy=16
@@ -132,26 +131,12 @@ NFQWS2_OPT="
 --lua-desync=multisplit:pos=2:strategy=18
 --lua-desync=fake:blob=maxru:tcp_flags_unset=ACK:tls_mod=rnd,dupsid,padencap:repeats=1:strategy=19
 --lua-desync=fakeddisorder:pos=2:tcp_flags_unset=ACK:strategy=19
---lua-desync=syndata:strategy=22
---lua-desync=multidisorder:strategy=22
---lua-desync=fake:blob=fake_default_tls:tcp_seq=1000000:repeats=1:strategy=25
---lua-desync=multidisorder:pos=1,midsld:strategy=25
-
-# 2. HTTP‑цепочка
---payload=http_req
---lua-desync=http_methodeol:strategy=20
---lua-desync=wssize:wsize=1:scale=6:strategy=21
---lua-desync=multidisorder:pos=2:strategy=21
---lua-desync=hostfakesplit:midhost=host-2:host_mod=host=rzd.ru:seqovl=726:tcp_ack=-66000:tcp_ack_inc=0:strategy=14
---lua-desync=fake:blob=fake_default_http:tcp_ts=-1000:repeats=1:strategy=23
---lua-desync=multidisorder:pos=method+2:strategy=23
---lua-desync=fakedsplit:pos=method+2,midsld:tcp_ack=-66000:tcp_ts_up:strategy=24
 
 --new
 
 --filter-tcp=80,443 --hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt
 --out-range=-s34228 and 
---in-range=-s5556 --lua-desync=circular 
+--in-range=-s5556 --lua-desync=circular_locked 
 --in-range=x
 --payload=tls_client_hello 
 --lua-desync=fake:blob=maxru:tcp_seq=-3000:repeats=1:strategy=1 --lua-desync=fake:blob=fake_default_tls:tcp_seq=-3000:tls_mod=rnd,dupsid:repeats=1:strategy=1
@@ -162,7 +147,7 @@ NFQWS2_OPT="
 
 --filter-udp=443 --hostlist=/opt/zapret2/extra_strats/UDP_YT_list.txt
 --out-range=-s34228 and 
---in-range=-s5556 --lua-desync=circular 
+--in-range=-s5556 --lua-desync=circular_locked 
 --in-range=x
 --payload=quic_initial
 --blob=quic_google:@/opt/zapret2/files/fake/quic_initial_www_google_com.bin
@@ -199,7 +184,7 @@ NFQWS2_OPT="
 
 
 # none,ipset,hostlist,autohostlist
-MODE_FILTER=none
+MODE_FILTER=hostlist
 
 # donttouch,none,software,hardware
 FLOWOFFLOAD=donttouch
