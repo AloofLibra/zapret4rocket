@@ -174,12 +174,29 @@ ORCH_SCRIPT="$ORCH_DIR/orchestrator.sh"
 ORCH_ENABLED_FLAG="$ORCH_DIR/enabled"
 ORCH_LUA_LOCKED="/opt/zapret2/lua/locked.lua"
 
-orchestra_install() {
+orchestra_update_from_repo() {
+  local url="https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/orchestra/orchestrator.sh"
+  local tmp="${ORCH_SCRIPT}.tmp"
+
   mkdir -p "$ORCH_DIR"
-  if [ -f "$SCRIPT_DIR/orchestra/orchestrator.sh" ]; then
-    cp "$SCRIPT_DIR/orchestra/orchestrator.sh" "$ORCH_SCRIPT"
-    chmod +x "$ORCH_SCRIPT"
+  if command -v curl >/dev/null 2>&1; then
+    if ! curl -fsSL -o "$tmp" "$url"; then
+      echo -e "${red}Не удалось скачать оркестратор (curl).${plain}"
+      return 1
+    fi
+  elif command -v wget >/dev/null 2>&1; then
+    if ! wget -qO "$tmp" "$url"; then
+      echo -e "${red}Не удалось скачать оркестратор (wget).${plain}"
+      return 1
+    fi
+  else
+    echo -e "${red}Нет curl или wget для обновления оркестратора.${plain}"
+    return 1
   fi
+
+  mv "$tmp" "$ORCH_SCRIPT"
+  chmod +x "$ORCH_SCRIPT"
+  echo -e "${green}Оркестратор обновлен из репозитория.${plain}"
 }
 
 orchestra_ensure_locked_lua() {
@@ -248,7 +265,6 @@ LUA
 }
 
 orchestra_start() {
-  orchestra_install
   orchestra_ensure_locked_lua
   touch "$ORCH_ENABLED_FLAG"
   if [ -x "$ORCH_SCRIPT" ]; then
@@ -910,6 +926,13 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "5")
+    orchestra_update_from_repo
+    if [ -x "$ORCH_SCRIPT" ]; then
+      if ps w | grep -F "$ORCH_SCRIPT run" | grep -v grep >/dev/null 2>&1; then
+        orchestra_stop
+        orchestra_start
+      fi
+    fi
     menu_action_update_config_reset
     pause_enter
     ;;
