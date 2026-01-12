@@ -13,10 +13,11 @@ strategies_submenu() {
     echo -e "  Текущие стратегии [${strategies_status}]"
     echo -e 
 
-    submenu_item "	1" "Профиль 1: TCP 80/443 (основной список)" "tls+http"
-    submenu_item "	2" "Профиль 2: TCP 80/443 (Discord)" "tls"
-    submenu_item "	3" "Профиль 3: UDP 443 (YouTube QUIC)" "udp"
-    submenu_item "	4" "Профиль 4: UDP (voice/discord/stun)" "udp"
+    submenu_item "	1" "Профиль 1: TCP 80/443 (YouTube)" "tls+http"
+    submenu_item "	2" "Профиль 2: TCP 80/443 (Googlevideo)" "tls"
+    submenu_item "	3" "Профиль 3: TCP 80/443 (RKN)" "tls"
+    submenu_item "	4" "Профиль 4: TCP 80/443 (Discord)" "tls"
+    submenu_item "	5" "Профиль 5: UDP 443 (YouTube QUIC)" "udp"
     submenu_item "	0" "Назад"
     echo ""
 
@@ -24,16 +25,20 @@ strategies_submenu() {
 
     case "$ans" in
       "1")
-        orch_profile_try "1" "Профиль 1: TCP 80/443 (основной список)" "tls http" "https://www.youtube.com/"
+        orch_profile_try "1" "Профиль 1: TCP 80/443 (YouTube)" "tls http" "https://www.youtube.com/"
         ;;
       "2")
-        orch_profile_try "2" "Профиль 2: TCP 80/443 (Discord)" "tls" "https://discord.com/"
+        orch_profile_try "2" "Профиль 2: TCP 80/443 (Googlevideo)" "tls" "https://$(get_yt_cluster_domain)"
         ;;
       "3")
-        orch_profile_try "3" "Профиль 3: UDP 443 (YouTube QUIC)" "udp" "https://www.youtube.com/"
+        orch_profile_try "3" "Профиль 3: TCP 80/443 (RKN)" "tls" "https://meduza.io"
         ;;
       "4")
-        orch_profile_try "4" "Профиль 4: UDP (voice/discord/stun)" "udp" "https://discord.com/"
+        orch_profile_try "4" "Профиль 4: TCP 80/443 (Discord)" "tls" "https://discord.com/"
+        ;;
+      "5")
+        echo -e "${yellow}Проверьте работоспособность в браузере.${plain}"
+        orch_profile_try "5" "Профиль 5: UDP 443 (YouTube QUIC)" "udp" ""
         ;;
       "0"|"")
         return
@@ -105,9 +110,9 @@ flowoffload_submenu() {
 tcp443_submenu() {
   while true; do
   clear
-  num=$(sed -n '112,128p' /opt/zapret2/config | grep -n '^--filter-tcp=443 --hostlist-domains= --' | head -n1 | cut -d: -f1)
+  num=$(sed -n '112,130p' /opt/zapret2/config | grep -n '^--filter-tcp=443 --hostlist-domains= --' | head -n1 | cut -d: -f1)
   echo -e "${yellow}Безразборный режим по стратегии: ${plain}$((num ? num : 0))"
-  echo -e "\033[33mС каким номером применить стратегию? (1-17, 0 - отключение безразборного режима, Enter - выход) \033[31mПри активации кастомно подобранные домены будут очищены:${plain}"
+  echo -e "\033[33mС каким номером применить стратегию? (1-19, 0 - отключение безразборного режима, Enter - выход) \033[31mПри активации кастомно подобранные домены будут очищены:${plain}"
   read -re -p " " answer_bezr
   
   case "$answer_bezr" in
@@ -115,9 +120,9 @@ tcp443_submenu() {
       return
       ;;
     *)
-      if echo "$answer_bezr" | grep -Eq '^[0-9]+$' && [ "$answer_bezr" -ge 0 ] && [ "$answer_bezr" -le 17 ]; then
+      if echo "$answer_bezr" | grep -Eq '^[0-9]+$' && [ "$answer_bezr" -ge 0 ] && [ "$answer_bezr" -le 19 ]; then
         #Отключение
-        for i in $(seq 112 128); do
+        for i in $(seq 112 130); do
           if sed -n "${i}p" /opt/zapret2/config | grep -Fq -- '--filter-tcp=443 --hostlist-domains= --h'; then
             sed -i "${i}s#--filter-tcp=443 --hostlist-domains= --h#--filter-tcp=443 --hostlist-domains=none.dom --h#" /opt/zapret2/config
             "$ZAPRET2_INIT" restart
@@ -126,8 +131,8 @@ tcp443_submenu() {
             break
           fi
         done
-        if [ "$answer_bezr" -ge 1 ] && [ "$answer_bezr" -le 17 ]; then
-          for f_clear in $(seq 1 17); do
+        if [ "$answer_bezr" -ge 1 ] && [ "$answer_bezr" -le 19 ]; then
+          for f_clear in $(seq 1 19); do
             echo -n > "/opt/zapret2/extra_strats/TCP/User/$f_clear.txt"
             echo -n > "/opt/zapret2/extra_strats/TCP/temp/$f_clear.txt"
           done
