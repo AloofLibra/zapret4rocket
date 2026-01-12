@@ -8,7 +8,7 @@
 WS_USER=nobody
 
 # override firewall type : iptables,nftables,ipfw
-FWTYPE=nftables
+FWTYPE=iptables
 # nftables only : set this to 0 to use pre-nat mode. default is post-nat.
 # pre-nat mode disables some bypass techniques for forwarded traffic but allows to see client IP addresses in debug log
 #POSTNAT=0
@@ -138,10 +138,8 @@ NFQWS2_OPT="
 --payload=tls_client_hello,http_req,http_reply 
 --lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 and 
---in-range=-s5556 --lua-desync=circular_locked:key=1:retrans=2:maxseq=16384:inseq=2048
+--in-range=-s5556 --lua-desync=circular_locked:key=2:retrans=2:maxseq=16384:inseq=2048
 --in-range=x 
---blob=maxru:@/opt/zapret2/files/fake/tls_clienthello_max_ru.bin
---blob=google_www:@/opt/zapret2/files/fake/tls_clienthello_www_google_com.bin
 --payload=tls_client_hello,http_req
 --lua-desync=multidisorder:pos=1,midsld:strategy=1
 --lua-desync=fakedsplit:pos=7,sld+1:nofake1:strategy=1
@@ -188,10 +186,8 @@ NFQWS2_OPT="
 --payload=tls_client_hello,http_req,http_reply 
 --lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 and 
---in-range=-s5556 --lua-desync=circular_locked:key=1:retrans=2:maxseq=16384:inseq=2048
+--in-range=-s5556 --lua-desync=circular_locked:key=3:retrans=2:maxseq=16384:inseq=2048
 --in-range=x 
---blob=maxru:@/opt/zapret2/files/fake/tls_clienthello_max_ru.bin
---blob=google_www:@/opt/zapret2/files/fake/tls_clienthello_www_google_com.bin
 --payload=tls_client_hello,http_req
 --lua-desync=multidisorder:pos=1,midsld:strategy=1
 --lua-desync=fakedsplit:pos=7,sld+1:nofake1:strategy=1
@@ -235,7 +231,7 @@ NFQWS2_OPT="
 #Отдельные стратегии для TCP_Discord
 --filter-tcp=80,443 --hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt
 --out-range=-s34228
---in-range=-s5556 --lua-desync=circular_locked:key=2 
+--in-range=-s5556 --lua-desync=circular_locked:key=4 
 --in-range=x
 --payload=tls_client_hello 
 --lua-desync=fake:blob=maxru:tcp_seq=-3000:repeats=1:strategy=1 --lua-desync=fake:blob=fake_default_tls:tcp_seq=-3000:tls_mod=rnd,dupsid:repeats=1:strategy=1
@@ -247,7 +243,7 @@ NFQWS2_OPT="
 #Стратегии для UDP_YT
 --filter-udp=443 --hostlist=/opt/zapret2/extra_strats/UDP_YT_list.txt
 --out-range=-s34228 and 
---in-range=-s5556 --lua-desync=circular_locked:key=3 
+--in-range=-s5556 --lua-desync=circular_locked:key=5 
 --in-range=x
 --payload=quic_initial
 --blob=quic_google:@/opt/zapret2/files/fake/quic_initial_www_google_com.bin
