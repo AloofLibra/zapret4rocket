@@ -176,6 +176,7 @@ ORCH_LUA_LOCKED="/opt/zapret2/lua/locked.lua"
 
 orchestra_update_from_repo() {
   local url="https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/orchestra/orchestrator.sh"
+  local locked_url="https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/orchestra/locked.lua"
   local tmp="${ORCH_SCRIPT}.tmp"
 
   mkdir -p "$ORCH_DIR"
@@ -184,9 +185,17 @@ orchestra_update_from_repo() {
       echo -e "${red}Не удалось скачать оркестратор (curl).${plain}"
       return 1
     fi
+    if ! curl -fsSL -o "$ORCH_LUA_LOCKED" "$locked_url"; then
+      echo -e "${red}Не удалось скачать locked.lua (curl).${plain}"
+      return 1
+    fi
   elif command -v wget >/dev/null 2>&1; then
     if ! wget -qO "$tmp" "$url"; then
       echo -e "${red}Не удалось скачать оркестратор (wget).${plain}"
+      return 1
+    fi
+    if ! wget -qO "$ORCH_LUA_LOCKED" "$locked_url"; then
+      echo -e "${red}Не удалось скачать locked.lua (wget).${plain}"
       return 1
     fi
   else
@@ -199,73 +208,7 @@ orchestra_update_from_repo() {
   echo -e "${green}Оркестратор обновлен из репозитория.${plain}"
 }
 
-orchestra_ensure_locked_lua() {
-  if [ ! -f "$ORCH_LUA_LOCKED" ]; then
-    cat > "$ORCH_LUA_LOCKED" <<'LUA'
-local LOCKED_PATH = "/opt/zapret2/extra_strats/cache/orchestra/locked.tsv"
-local last_load = 0
-local cache_ttl = 2
-local LOCKED_TLS = {}
-local LOCKED_HTTP = {}
-local LOCKED_UDP = {}
-
-local function load_locked_tables()
-  local now = os.time()
-  if now and (now - last_load) < cache_ttl then return end
-  last_load = now or 0
-  LOCKED_TLS = {}
-  LOCKED_HTTP = {}
-  LOCKED_UDP = {}
-
-  local f = io.open(LOCKED_PATH, "r")
-  if not f then return end
-  for line in f:lines() do
-    if line ~= "" then
-      local p1, p2, p3 = string.match(line, "^([^\t]+)\t([^\t]+)\t([^\t]+)$")
-      if p1 then
-        local profile = string.lower(p1)
-        local proto = string.lower(p2)
-        local strat = tonumber(p3)
-        if strat then
-          if proto == "http" then LOCKED_HTTP[profile] = strat
-          elseif proto == "udp" then LOCKED_UDP[profile] = strat
-          else LOCKED_TLS[profile] = strat end
-        end
-      else
-        local p, s = string.match(line, "^([^\t]+)\t([^\t]+)$")
-        if p and s then
-          local strat = tonumber(s)
-          if strat then LOCKED_TLS[string.lower(p)] = strat end
-        end
-      end
-    end
-  end
-  f:close()
-end
-
-function locked_strategy_for_profile(profile, proto)
-  if not profile then return nil end
-  profile = string.lower(tostring(profile))
-  proto = string.lower(tostring(proto or "tls"))
-  load_locked_tables()
-  if proto == "http" then return LOCKED_HTTP[profile] end
-  if proto == "udp" then return LOCKED_UDP[profile] end
-  return LOCKED_TLS[profile]
-end
-
-function desync_profile_key(desync)
-  return "default"
-end
-
-function circular_locked(ctx, desync)
-  return circular(ctx, desync)
-end
-LUA
-  fi
-}
-
 orchestra_start() {
-  orchestra_ensure_locked_lua
   touch "$ORCH_ENABLED_FLAG"
   if [ -x "$ORCH_SCRIPT" ]; then
     "$ORCH_SCRIPT" start
@@ -294,69 +237,6 @@ orchestra_status_text() {
     fi
   fi
   echo "Выключен"
-}
-
-orchestra_profile_lock_menu() {
-  local lock_file="$ORCH_DIR/locked.tsv"
-  local profile="" proto="" strat="" tmp=""
-
-  mkdir -p "$ORCH_DIR"
-  touch "$lock_file"
-
-  clear
-  echo -e "${cyan}--- Ручная фиксация стратегии профиля ---${plain}"
-  if [ -s "$lock_file" ]; then
-    echo "Текущие фиксации (profile proto strategy):"
-    awk 'BEGIN{FS="\t"}{
-      if (NF==2) printf "%s tls %s\n", $1, $2;
-      else if (NF>=3) printf "%s %s %s\n", $1, $2, $3;
-    }' "$lock_file"
-  else
-    echo "Фиксаций нет."
-  fi
-  echo ""
-
-  read -re -p "Профиль (как в логах desync profile, Enter - выход): " profile
-  [ -z "$profile" ] && return
-
-  read -re -p "Протокол tls/http/udp (Enter - tls): " proto
-  [ -z "$proto" ] && proto="tls"
-  case "$proto" in
-    tls|http|udp) ;;
-    *)
-      echo "Неизвестный протокол, ставлю tls."
-      proto="tls"
-      ;;
-  esac
-
-  read -re -p "Стратегия (1..N, 0 - снять фиксацию): " strat
-  if ! echo "$strat" | grep -Eq '^[0-9]+$'; then
-    echo "Неверный номер стратегии."
-    pause_enter
-    return
-  fi
-
-  tmp="${lock_file}.tmp"
-  if [ "$strat" -eq 0 ]; then
-    awk -v pr="$profile" -v p="$proto" 'BEGIN{FS=OFS="\t"}{
-      if ($1==pr && (($2==p) || (NF==2 && p=="tls"))) next
-      print
-    }' "$lock_file" > "$tmp" && mv "$tmp" "$lock_file"
-    echo "Фиксация снята: $profile $proto"
-  else
-    awk -v pr="$profile" -v p="$proto" -v s="$strat" 'BEGIN{FS=OFS="\t"}{
-      if ($1==pr && (($2==p) || (NF==2 && p=="tls"))) {print pr,p,s; found=1; next}
-      print
-    } END{
-      if (!found) print pr,p,s
-    }' "$lock_file" > "$tmp" && mv "$tmp" "$lock_file"
-    echo "Фиксация установлена: $profile $proto стратегия $strat"
-  fi
-
-  if [ -x "$ORCH_SCRIPT" ]; then
-    "$ORCH_SCRIPT" sync
-  fi
-  pause_enter
 }
 
 change_user() {
@@ -497,7 +377,6 @@ blockcheck2_format_elapsed() {
 blockcheck2_get_uuid() {
   local tel_uuid=""
   if [ -n "$TELEMETRY_CFG" ] && [ -f "$TELEMETRY_CFG" ]; then
-    # shellcheck disable=SC1090
     source "$TELEMETRY_CFG"
   fi
   if [ -z "$tel_uuid" ]; then
@@ -865,7 +744,7 @@ Enter (без цифр) - переустановка/обновление zapret
 9. Переключатель zapret2 на nftables/iptables (На всё жать Enter). Актуально для OpenWRT 21+. Может помочь с войсами. Сейчас: '"${plain}"'['"$(grep -q '^FWTYPE=iptables$' /opt/zapret2/config && echo "iptables" || (grep -q '^FWTYPE=nftables$' /opt/zapret2/config && echo "nftables" || echo "Неизвестно"))"']'"${yellow}"'
 10. (Де)активировать обход UDP на 1026-65531 портах (BF6, Fifa и т.п.). Сейчас: '"${plain}"'['"$(grep -q '^NFQWS_PORTS_UDP=443' /opt/zapret2/config && echo "Выключен" || (grep -q '^NFQWS_PORTS_UDP=1026-65531,443' /opt/zapret2/config && echo "Включен" || echo "Неизвестно"))"']'"${yellow}"'
 11. Управление аппаратным ускорением zapret2. Может увеличить скорость на роутере. Сейчас: '"${plain}"'['"$(grep '^FLOWOFFLOAD=' /opt/zapret2/config)"']'"${yellow}"'
-12. Меню (Де)Активации работы по всем доменам TCP-443 без хост-листов (не затрагивает youtube стратегии) (безразборный режим) Сейчас: '"${plain}"'['"$(num=$(sed -n '112,128p' /opt/zapret2/config | grep -n '^--filter-tcp=443 --hostlist-domains= --' | head -n1 | cut -d: -f1); [ -n "$num" ] && echo "$num" || echo "Отключен")"']'"${yellow}"'
+12. Меню (Де)Активации работы по всем доменам TCP-443 без хост-листов (не затрагивает youtube стратегии) (безразборный режим) Сейчас: '"${plain}"'['"$(num=$(sed -n '112,130p' /opt/zapret2/config | grep -n '^--filter-tcp=443 --hostlist-domains= --' | head -n1 | cut -d: -f1); [ -n "$num" ] && echo "$num" || echo "Отключен")"']'"${yellow}"'
 13. Активировать доступ в меню через браузер (~3мб места)
 14. Провайдер
 777. Активировать zeefeer premium (Нажимать только Valery ProD, avg97, Xoz, GeGunT, blagodarenya, mikhyan, Xoz, andric62, Whoze, Necronicle, Andrei_5288515371, Nomand, Dina_turat, Nergalss, Александру, АлександруП, vecheromholodno, ЕвгениюГ, Dyadyabo, skuwakin, izzzgoy, Grigaraz, Reconnaissance, comandante1928, umad, rudnev2028, rutakote, railwayfx, vtokarev1604, Grigaraz, a40letbezurojaya и subzeero452 и остальным поддержавшим проект. Но если очень хочется - можно нажать и другим)\033[0m'
