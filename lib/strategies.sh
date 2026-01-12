@@ -20,9 +20,9 @@ get_active_strat_num() {
 # Функция для генерации строки статуса стратегий
 get_current_strategies_info() {
     local s_udp=$(get_active_strat_num "/opt/zapret2/extra_strats/UDP/YT" 8)
-    local s_tcp=$(get_active_strat_num "/opt/zapret2/extra_strats/TCP/YT" 17)
-    local s_gv=$(get_active_strat_num "/opt/zapret2/extra_strats/TCP/GV" 17)
-    local s_rkn=$(get_active_strat_num "/opt/zapret2/extra_strats/TCP/RKN" 17)
+    local s_tcp=$(get_active_strat_num "/opt/zapret2/extra_strats/TCP/YT" 19)
+    local s_gv=$(get_active_strat_num "/opt/zapret2/extra_strats/TCP/GV" 19)
+    local s_rkn=$(get_active_strat_num "/opt/zapret2/extra_strats/TCP/RKN" 19)
     
     # Формируем красивую строку. Цвета можно менять.
     # Функция для окраски: 0 - серый, >0 - зеленый
@@ -176,14 +176,15 @@ orch_profile_try() {
 }
 
 get_orchestra_locks_info() {
-    local p1_tls="" p1_http="" p2_tls="" p3_udp="" p4_udp=""
+    local p1_tls="" p1_http="" p2_tls="" p3_tls="" p4_tls="" p5_udp=""
     p1_tls="$(orch_locked_get 1 tls)"
     p1_http="$(orch_locked_get 1 http)"
     p2_tls="$(orch_locked_get 2 tls)"
-    p3_udp="$(orch_locked_get 3 udp)"
-    p4_udp="$(orch_locked_get 4 udp)"
-    printf "P1(tls=%s,http=%s) P2(tls=%s) P3(udp=%s) P4(udp=%s)" \
-        "${p1_tls:-0}" "${p1_http:-0}" "${p2_tls:-0}" "${p3_udp:-0}" "${p4_udp:-0}"
+    p3_tls="$(orch_locked_get 3 tls)"
+    p4_tls="$(orch_locked_get 4 tls)"
+    p5_udp="$(orch_locked_get 5 udp)"
+    printf "P1(tls=%s,http=%s) P2(tls=%s) P3(tls=%s) P4(tls=%s) P5(udp=%s)" \
+        "${p1_tls:-0}" "${p1_http:-0}" "${p2_tls:-0}" "${p3_tls:-0}" "${p4_tls:-0}" "${p5_udp:-0}"
 }
 
 #Функция для функции подбора стратегий
@@ -318,13 +319,13 @@ Strats_Tryer() {
       echo "Подбор для хост-листа YouTube с видеопотоком (UDP QUIC - браузеры, моб. приложения). Ранее заданная стратегия этого листа сброшена в дефолт."
       #вывод подсказки
       show_hint "UDP"
-      try_strategies 8 "/opt/zapret2/extra_strats/UDP/YT" "/opt/zapret2/extra_strats/UDP/YT/List.txt" ""
+      try_strategies 13 "/opt/zapret2/extra_strats/UDP/YT" "/opt/zapret2/extra_strats/UDP/YT/List.txt" ""
       ;;
     "2")
       echo "Подбор для хост-листа YouTube (TCP - сам интерфейс. Без видео-домена). Ранее заданная стратегия этого листа сброшена в дефолт."
       #вывод подсказки
       show_hint "TCP"
-      try_strategies 17 "/opt/zapret2/extra_strats/TCP/YT" "/opt/zapret2/extra_strats/TCP/YT/List.txt" ""
+      try_strategies 19 "/opt/zapret2/extra_strats/TCP/YT" "/opt/zapret2/extra_strats/TCP/YT/List.txt" ""
       ;;
     "3")
       echo "Подбор для googlevideo.com (Видеопоток YouTube). Ранее заданная стратегия этого листа сброшена в дефолт."
@@ -334,17 +335,17 @@ Strats_Tryer() {
       user_domain="googlevideo.com"
       #вывод подсказки
       show_hint "GV"
-      try_strategies 17 "/opt/zapret2/extra_strats/TCP/GV" "/dev/null" ""
+      try_strategies 19 "/opt/zapret2/extra_strats/TCP/GV" "/dev/null" ""
       ;;
     "4")
       echo "Подбор для хост-листа основных доменов блока RKN. Проверка доступности задана на домен meduza.io. Ранее заданная стратегия этого листа сброшена в дефолт."
-      for numRKN in {1..17}; do
+      for numRKN in {1..19}; do
         echo -n > "/opt/zapret2/extra_strats/TCP/RKN/${numRKN}.txt"
       done
       user_domain="meduza.io"
       #вывод подсказки
       show_hint "RKN"
-      try_strategies 17 "/opt/zapret2/extra_strats/TCP/RKN" "/opt/zapret2/extra_strats/TCP/RKN/List.txt" ""
+      try_strategies 19 "/opt/zapret2/extra_strats/TCP/RKN" "/opt/zapret2/extra_strats/TCP/RKN/List.txt" ""
       ;;
     "5")
       echo "Режим ручного указания домена"
@@ -355,7 +356,7 @@ Strats_Tryer() {
       fi
       echo "Введён домен: $user_domain"
 
-      try_strategies 17 "/opt/zapret2/extra_strats/TCP/temp" "/dev/null" \
+      try_strategies 19 "/opt/zapret2/extra_strats/TCP/temp" "/dev/null" \
         "echo -n > \"/opt/zapret2/extra_strats/TCP/temp/\${strat_num}.txt\"; \
          echo \"$user_domain\" >> \"/opt/zapret2/extra_strats/TCP/User/\${strat_num}.txt\""
       ;;
