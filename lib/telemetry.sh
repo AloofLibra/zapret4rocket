@@ -89,9 +89,9 @@ send_stats() {
 
     # 2. Определяем номера стратегий
     local s_udp=$(get_active_strat_num "/opt/zapret2/extra_strats/UDP/YT" 8)
-    local s_tcp=$(get_active_strat_num "/opt/zapret2/extra_strats/TCP/YT" 17)
-    local s_gv=$(get_active_strat_num "/opt/zapret2/extra_strats/TCP/GV" 17)
-    local s_rkn=$(get_active_strat_num "/opt/zapret2/extra_strats/TCP/RKN" 17)
+    local s_tcp=$(get_active_strat_num "/opt/zapret2/extra_strats/TCP/YT" 19)
+    local s_gv=$(get_active_strat_num "/opt/zapret2/extra_strats/TCP/GV" 19)
+    local s_rkn=$(get_active_strat_num "/opt/zapret2/extra_strats/TCP/RKN" 19)
 
     # 3. Отправка в Google Forms (Тихий режим, в фоне &)
     curl -sL --max-time 10 \
