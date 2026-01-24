@@ -278,6 +278,9 @@ orchestra_set_mode() {
 
 orchestra_start() {
   touch "$ORCH_ENABLED_FLAG"
+  if [ ! -x "$ORCH_SCRIPT" ]; then
+    orchestra_update_from_repo || true
+  fi
   if [ -x "$ORCH_SCRIPT" ]; then
     "$ORCH_SCRIPT" start
   fi
@@ -303,6 +306,10 @@ orchestra_status_text() {
         return
       fi
     fi
+  fi
+  if [ -f "$ORCH_ENABLED_FLAG" ]; then
+    echo "Включен (не запущен)"
+    return
   fi
   echo "Выключен"
 }
@@ -583,6 +590,7 @@ get_repo() {
   chmod 777 /opt/zapret2/extra_strats/cache/orchestra 2>/dev/null || true
   touch /opt/zapret2/extra_strats/cache/orchestra/auto_locked.tsv 2>/dev/null || true
   chmod 666 /opt/zapret2/extra_strats/cache/orchestra/auto_locked.tsv 2>/dev/null || true
+  orchestra_update_from_repo || true
   for listfile in cloudflare-ipset.txt cloudflare-ipset_v6.txt netrogat.txt russia-discord.txt russia-youtube-rtmps.txt russia-youtube.txt russia-youtubeQ.txt tg_cidr.txt; do
     curl -L -o /opt/zapret2/lists/$listfile https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z2r/lists/$listfile
   done
