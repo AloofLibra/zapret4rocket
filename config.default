@@ -90,7 +90,7 @@ NFQWS2_OPT="
 #Стратегии для YT
 --qnum 300 --filter-tcp=443 --filter-l7=tls
 --hostlist=/opt/zapret2/extra_strats/TCP_YT_list.txt 
---payload=tls_client_hello,http_req,http_reply,unknown 
+--payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello  
 --lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 
 --in-range=-s32768 --lua-desync=circular_quality:key=1:retrans=2:maxseq=16384:inseq=8192:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector
@@ -139,7 +139,7 @@ NFQWS2_OPT="
 
 --filter-tcp=443 --filter-l7=tls
 --hostlist-domains=googlevideo.com
---payload=tls_client_hello,http_req,http_reply,unknown 
+--payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello 
 --lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 
 --in-range=-s32768 --lua-desync=circular_quality:key=1:retrans=2:maxseq=16384:inseq=8192:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector
@@ -187,7 +187,7 @@ NFQWS2_OPT="
 #Стратегии для RKN
 --filter-tcp=80,443,2053,2083,2087,2096,8443 --filter-l7=tls 
 --hostlist=/opt/zapret2/extra_strats/TCP_RKN_list.txt 
---payload=tls_client_hello,http_req,http_reply,unknown 
+--payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello  
 --lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 
 --in-range=-s32768 --lua-desync=circular_quality:key=1:retrans=2:maxseq=16384:inseq=8192:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector
@@ -234,7 +234,7 @@ NFQWS2_OPT="
 
 #Отдельные стратегии для TCP_Discord
 --filter-tcp=80,443,2053,2083,2087,2096,8443 --hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt
---payload=tls_client_hello,http_req,http_reply,unknown 
+--payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello 
 --lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 
 --in-range=-s32768 --lua-desync=circular_quality:key=1:retrans=2:maxseq=16384:inseq=8192:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector
