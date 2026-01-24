@@ -264,6 +264,8 @@ orchestra_config_set_mode() {
         $0 = $0 ":udp_out=6:udp_in=0"
       } else if ($0 ~ /--lua-desync=circular_/ && $0 ~ /:key=6(\b|:)/ && $0 !~ /udp_out=/) {
         $0 = $0 ":udp_out=6:udp_in=0"
+      } else if ($0 ~ /--lua-desync=circular_/ && $0 ~ /:key=1(\b|:)/ && $0 !~ /tcp_out=/) {
+        $0 = $0 ":tcp_out=6:tcp_in=1"
       }
       print
     }
