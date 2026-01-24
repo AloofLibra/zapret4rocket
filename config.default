@@ -134,6 +134,14 @@ NFQWS2_OPT="
 --lua-desync=multisplit:pos=2:strategy=18
 --lua-desync=fake:blob=maxru:tcp_flags_unset=ACK:tls_mod=rnd,dupsid,padencap:repeats=1:strategy=19
 --lua-desync=fakeddisorder:pos=2:tcp_flags_unset=ACK:strategy=19
+--lua-desync=fake:blob=0x0F0F0F0F:tcp_seq=-10000:tcp_ack=-66000:badsum:strategy=20
+--lua-desync=fake:blob=google_www:optional:tcp_seq=-10000:tcp_ack=-66000:badsum:tls_mod=rnd,dupsid,sni=ggpht.com:strategy=20
+--lua-desync=multisplit:pos=2,sld:seqovl=620:seqovl_pattern=google_www:strategy=20
+--lua-desync=hostfakesplit:midhost=host-2:host=rzd.ru:tcp_seq=0:tcp_ack=-66000:badsum:strategy=21
+--lua-desync=fake:blob=0x0F0F0F0F:tcp_seq=0:tcp_ack=-66000:badsum:tls_mod=none:strategy=22
+--lua-desync=fakeddisorder:pos=10,midsld:seqovl=336:seqovl_pattern=maxru:pattern=google_www:tcp_seq=0:tcp_ack=-66000:badsum:strategy=22
+--lua-desync=multisplit:pos=1,sniext+1:seqovl=1:strategy=23
+
 
 --new
 
@@ -181,6 +189,13 @@ NFQWS2_OPT="
 --lua-desync=multisplit:pos=2:strategy=18
 --lua-desync=fake:blob=maxru:tcp_flags_unset=ACK:tls_mod=rnd,dupsid,padencap:repeats=1:strategy=19
 --lua-desync=fakeddisorder:pos=2:tcp_flags_unset=ACK:strategy=19
+--lua-desync=fake:blob=0x0F0F0F0F:tcp_seq=-10000:tcp_ack=-66000:badsum:strategy=20
+--lua-desync=fake:blob=google_www:optional:tcp_seq=-10000:tcp_ack=-66000:badsum:tls_mod=rnd,dupsid,sni=ggpht.com:strategy=20
+--lua-desync=multisplit:pos=2,sld:seqovl=620:seqovl_pattern=google_www:strategy=20
+--lua-desync=hostfakesplit:midhost=host-2:host=rzd.ru:tcp_seq=0:tcp_ack=-66000:badsum:strategy=21
+--lua-desync=fake:blob=0x0F0F0F0F:tcp_seq=0:tcp_ack=-66000:badsum:tls_mod=none:strategy=22
+--lua-desync=fakeddisorder:pos=10,midsld:seqovl=336:seqovl_pattern=maxru:pattern=google_www:tcp_seq=0:tcp_ack=-66000:badsum:strategy=22
+--lua-desync=multisplit:pos=1,sniext+1:seqovl=1:strategy=23
 
 --new
 
@@ -229,6 +244,13 @@ NFQWS2_OPT="
 --lua-desync=multisplit:pos=2:strategy=18
 --lua-desync=fake:blob=maxru:tcp_flags_unset=ACK:tls_mod=rnd,dupsid,padencap:repeats=1:strategy=19
 --lua-desync=fakeddisorder:pos=2:tcp_flags_unset=ACK:strategy=19
+--lua-desync=fake:blob=0x0F0F0F0F:tcp_seq=-10000:tcp_ack=-66000:badsum:strategy=20
+--lua-desync=fake:blob=google_www:optional:tcp_seq=-10000:tcp_ack=-66000:badsum:tls_mod=rnd,dupsid,sni=ggpht.com:strategy=20
+--lua-desync=multisplit:pos=2,sld:seqovl=620:seqovl_pattern=google_www:strategy=20
+--lua-desync=hostfakesplit:midhost=host-2:host=rzd.ru:tcp_seq=0:tcp_ack=-66000:badsum:strategy=21
+--lua-desync=fake:blob=0x0F0F0F0F:tcp_seq=0:tcp_ack=-66000:badsum:tls_mod=none:strategy=22
+--lua-desync=fakeddisorder:pos=10,midsld:seqovl=336:seqovl_pattern=maxru:pattern=google_www:tcp_seq=0:tcp_ack=-66000:badsum:strategy=22
+--lua-desync=multisplit:pos=1,sniext+1:seqovl=1:strategy=23
 
 --new
 
