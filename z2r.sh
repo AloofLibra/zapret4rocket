@@ -270,6 +270,16 @@ orchestra_config_set_mode() {
       print
     }
   ' "$cfg" > "$tmp" && mv "$tmp" "$cfg"
+
+  # Ensure TLS ServerHello is included in payload filters for TCP profiles.
+  awk '
+    {
+      if ($0 ~ /--payload=/ && $0 ~ /tls_client_hello/ && $0 !~ /tls_server_hello/) {
+        sub(/--payload=/, "--payload=tls_server_hello,", $0)
+      }
+      print
+    }
+  ' "$cfg" > "$tmp" && mv "$tmp" "$cfg"
 }
 
 orchestra_set_mode() {
