@@ -83,13 +83,17 @@ NFQWS2_UDP_PKT_IN=3
 NFQWS2_OPT="
 --debug=syslog
 
+--lua-init=@/opt/zapret2/lua/strategy-lock-manager.lua
+--lua-init=@/opt/zapret2/lua/combined-detector.lua
+--lua-init=@/opt/zapret2/lua/domain-grouping.lua
+--lua-init=@/opt/zapret2/lua/silent-drop-detector.lua
 #Стратегии для YT
---qnum 300 --filter-tcp=80,443 --filter-l7=http,tls
+--qnum 300 --filter-tcp=443 --filter-l7=tls
 --hostlist=/opt/zapret2/extra_strats/TCP_YT_list.txt 
---payload=tls_client_hello,http_req,http_reply 
+--payload=tls_client_hello,http_req,http_reply,unknown 
 --lua-init=@/opt/zapret2/lua/locked.lua
---out-range=-s34228 and 
---in-range=-s5556 --lua-desync=circular_locked:key=1:retrans=2:maxseq=16384:inseq=2048
+--out-range=-s34228 
+--in-range=-s32768 --lua-desync=circular_quality:key=1:retrans=2:maxseq=16384:inseq=8192:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector
 --in-range=x 
 --blob=maxru:@/opt/zapret2/files/fake/tls_clienthello_max_ru.bin
 --blob=google_www:@/opt/zapret2/files/fake/tls_clienthello_www_google_com.bin
@@ -133,12 +137,12 @@ NFQWS2_OPT="
 
 --new
 
---filter-tcp=80,443 --filter-l7=http,tls
+--filter-tcp=443 --filter-l7=tls
 --hostlist-domains=googlevideo.com
---payload=tls_client_hello,http_req,http_reply 
+--payload=tls_client_hello,http_req,http_reply,unknown 
 --lua-init=@/opt/zapret2/lua/locked.lua
---out-range=-s34228 and 
---in-range=-s5556 --lua-desync=circular_locked:key=2:retrans=2:maxseq=16384:inseq=2048
+--out-range=-s34228 
+--in-range=-s32768 --lua-desync=circular_quality:key=1:retrans=2:maxseq=16384:inseq=8192:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector
 --in-range=x 
 --payload=tls_client_hello,http_req
 --lua-desync=multidisorder:pos=1,midsld:strategy=1
@@ -181,12 +185,12 @@ NFQWS2_OPT="
 --new
 
 #Стратегии для RKN
---filter-tcp=80,443,2053,2083,2087,2096,8443 --filter-l7=http,tls 
+--filter-tcp=80,443,2053,2083,2087,2096,8443 --filter-l7=tls 
 --hostlist=/opt/zapret2/extra_strats/TCP_RKN_list.txt 
---payload=tls_client_hello,http_req,http_reply 
+--payload=tls_client_hello,http_req,http_reply,unknown 
 --lua-init=@/opt/zapret2/lua/locked.lua
---out-range=-s34228 and 
---in-range=-s5556 --lua-desync=circular_locked:key=3:retrans=2:maxseq=16384:inseq=2048
+--out-range=-s34228 
+--in-range=-s32768 --lua-desync=circular_quality:key=1:retrans=2:maxseq=16384:inseq=8192:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector
 --in-range=x 
 --payload=tls_client_hello,http_req
 --lua-desync=multidisorder:pos=1,midsld:strategy=1
@@ -229,11 +233,13 @@ NFQWS2_OPT="
 --new
 
 #Отдельные стратегии для TCP_Discord
---filter-tcp=80,443 --hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt
---out-range=-s34228
---in-range=-s5556 --lua-desync=circular_locked:key=4 
---in-range=x
---payload=tls_client_hello 
+--filter-tcp=80,443,2053,2083,2087,2096,8443 --hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt
+--payload=tls_client_hello,http_req,http_reply,unknown 
+--lua-init=@/opt/zapret2/lua/locked.lua
+--out-range=-s34228 
+--in-range=-s32768 --lua-desync=circular_quality:key=1:retrans=2:maxseq=16384:inseq=8192:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector
+--in-range=x 
+--payload=tls_client_hello,discord_ip_discovery 
 --lua-desync=fake:blob=maxru:tcp_seq=-3000:repeats=1:strategy=1 --lua-desync=fake:blob=fake_default_tls:tcp_seq=-3000:tls_mod=rnd,dupsid:repeats=1:strategy=1
 --lua-desync=fake:blob=maxru:tcp_seq=1:strategy=2
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:strategy=3
@@ -242,8 +248,9 @@ NFQWS2_OPT="
 
 #Стратегии для UDP_YT
 --filter-udp=443 --hostlist=/opt/zapret2/extra_strats/UDP_YT_list.txt
---out-range=-s34228 and 
---in-range=-s5556 --lua-desync=circular_locked:key=5 
+--in-range=-d100
+--out-range=-d100
+--lua-desync=circular_quality:key=5:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector:udp_out=6:udp_in=0 
 --in-range=x
 --payload=quic_initial
 --blob=quic_google:@/opt/zapret2/files/fake/quic_initial_www_google_com.bin
@@ -267,10 +274,34 @@ NFQWS2_OPT="
 
 #Стратегии для голосовой связи. В первую очередь Discord, но может ещё для чего поможет
 --filter-udp=50000-50099,1400,3478-3481,5349,19294-19344 
---filter-l7=discord,stun 
---payload=quic_initial 
+--filter-l7=discord,stun
+--in-range=-d100
+--out-range=-d100
+--lua-desync=circular_quality:key=5:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector
+--payload=quic_initial,discord_ip_discovery 
 --blob=fake_quic_www_google:/opt/zapret2/files/fake/quic_initial_www_google_com.bin 
---lua-desync=fake:udp:blob=fake_quic_www_google:repeats=2
+--lua-desync=fake:blob=0x00000000000000000000000000000000:repeats=2:out_range=-d10:strategy=1
+--lua-desync=fake:blob=0x00:out_range=-d10:strategy=2
+--lua-desync=fake:blob=quic_google:repeats=6:out_range=-d3:strategy=3
+--lua-desync=fake:blob=quic_google:repeats=10:out_range=-n5:strategy=4
+--lua-desync=fake:blob=quic_google:out_range=-n4:strategy=5
+--lua-desync=fake:blob=quic1:out_range=-d2:strategy=6
+--lua-desync=fake:blob=0x00:repeats=4:out_range=-d10:strategy=7
+--lua-desync=fake:blob=0x00:repeats=6:out_range=-d10:strategy=8
+--lua-desync=fake:blob=fake_default_udp:out_range=-d10:strategy=9
+--lua-desync=fake:blob=fake_default_udp:repeats=6:out_range=-d100:strategy=10
+--lua-desync=fake:blob=fake_default_udp:repeats=6:out_range=-d3:strategy=11
+--lua-desync=fake:blob=fake_default_udp:repeats=8:out_range=-d3:strategy=12
+--lua-desync=fake:blob=fake_default_udp:repeats=8:out_range=-d4:strategy=13
+--lua-desync=fake:blob=fake_default_udp:repeats=6:out_range=-n4:strategy=14
+--lua-desync=fake:blob=fake_default_udp:out_range=-n3:strategy=15
+--lua-desync=fake:blob=0x00:repeats=4:ip_autottl=0,3-20:ip6_autottl=0,3-20:out_range=-d10:strategy=16
+--lua-desync=fake:blob=0x00:repeats=6:out_range=-n2:strategy=17
+--lua-desync=fake:blob=quic_google:out_range=-n2:strategy=18
+--lua-desync=fake:blob=quic_test:out_range=-d2:strategy=19
+--lua-desync=send:repeats=2:ip_autottl=0,3-200:strategy=20 --lua-desync=fake:blob=fake_default_udp:ip_autottl=0,3-20:out_range=-d100:strategy=20
+--lua-desync=send:repeats=2:ip6_autottl=0,3-20:strategy=21 --lua-desync=fake:blob=fake_default_udp:ip6_autottl=0,3-20:out_range=-d10:strategy=21
+--lua-desync=fake:blob=fake_default_udp:repeats=11:out_range=-d5:strategy=22
 
 --new
 
