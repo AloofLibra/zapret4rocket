@@ -5,7 +5,7 @@
 function silent_drop_detector(desync, crec, arg)
     if crec.nocheck then return false end
 
-    local tcp_out = tonumber(arg.tcp_out) or 6  -- outgoing data packets threshold
+    local tcp_out = tonumber(arg.tcp_out) or 4  -- outgoing data packets threshold
     local tcp_in = tonumber(arg.tcp_in) or 1    -- incoming DATA packets threshold (1 = only SYN-ACK)
 
     if desync.dis.tcp and desync.outgoing and desync.track then
