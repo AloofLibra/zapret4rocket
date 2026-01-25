@@ -326,6 +326,36 @@ orchestra_status_text() {
   echo "Выключен"
 }
 
+hostlist_mode_text() {
+  local cfg="/opt/zapret2/config"
+  if [ -f "$cfg" ]; then
+    if grep -q '^MODE_FILTER=autohostlist' "$cfg"; then
+      echo "авто"
+      return
+    fi
+    if grep -q '^MODE_FILTER=hostlist' "$cfg"; then
+      echo "по листам"
+      return
+    fi
+  fi
+  echo "неизвестно"
+}
+
+toggle_hostlist_mode() {
+  for cfg in /opt/zapret2/config /opt/zapret2/config.default; do
+    [ -f "$cfg" ] || continue
+    if grep -q '^MODE_FILTER=autohostlist' "$cfg"; then
+      sed -i 's/^MODE_FILTER=autohostlist/MODE_FILTER=hostlist/' "$cfg"
+      # Disable <HOSTLIST> placeholder for RKN strategy only
+      sed -i 's#\(--hostlist=/opt/zapret2/extra_strats/TCP_RKN_list\.txt\) <HOSTLIST>#\1#g' "$cfg"
+    elif grep -q '^MODE_FILTER=hostlist' "$cfg"; then
+      sed -i 's/^MODE_FILTER=hostlist/MODE_FILTER=autohostlist/' "$cfg"
+      # Enable <HOSTLIST> placeholder for RKN strategy only
+      sed -i 's#\(--hostlist=/opt/zapret2/extra_strats/TCP_RKN_list\.txt\)#\1 <HOSTLIST>#g' "$cfg"
+    fi
+  done
+}
+
 orchestra_show_switches() {
   local lines=400
   local view_mode=""
@@ -954,7 +984,7 @@ Enter (без цифр) - переустановка/обновление zapret
 9. Переключатель zapret2 на nftables/iptables (На всё жать Enter). Актуально для OpenWRT 21+. Может помочь с войсами. Сейчас: '"${plain}"'['"$(grep -q '^FWTYPE=iptables$' /opt/zapret2/config && echo "iptables" || (grep -q '^FWTYPE=nftables$' /opt/zapret2/config && echo "nftables" || echo "Неизвестно"))"']'"${yellow}"'
 10. (Де)активировать обход UDP на 1026-65531 портах (BF6, Fifa и т.п.). Сейчас: '"${plain}"'['"$(grep -q '^NFQWS_PORTS_UDP=443' /opt/zapret2/config && echo "Выключен" || (grep -q '^NFQWS_PORTS_UDP=1026-65531,443' /opt/zapret2/config && echo "Включен" || echo "Неизвестно"))"']'"${yellow}"'
 11. Управление аппаратным ускорением zapret2. Может увеличить скорость на роутере. Сейчас: '"${plain}"'['"$(grep '^FLOWOFFLOAD=' /opt/zapret2/config)"']'"${yellow}"'
-12. Меню (Де)Активации работы по всем доменам TCP-443 без хост-листов (не затрагивает youtube стратегии) (безразборный режим) Сейчас: '"${plain}"'['"$(num=$(sed -n '112,130p' /opt/zapret2/config | grep -n '^--filter-tcp=443 --hostlist-domains= --' | head -n1 | cut -d: -f1); [ -n "$num" ] && echo "$num" || echo "Отключен")"']'"${yellow}"'
+12. Режим фильтра hostlist/autohostlist. Сейчас: '"${plain}"'['"$(hostlist_mode_text)"']'"${yellow}"'
 13. Активировать доступ в меню через браузер (~3мб места)
 14. Провайдер
 15. Режим оркестратора (ручной/авто). Сейчас: '"${plain}"'['"$(orchestra_mode_current)"']'"${yellow}"'
@@ -1099,7 +1129,13 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "12")
-    tcp443_submenu        # сабменю само в цикле и выходит через return
+    toggle_hostlist_mode
+    if pidof nfqws2 >/dev/null; then
+      "$ZAPRET2_INIT" restart
+      orchestra_start
+      echo -e "${green}zapret2 перезапущен для применения режима${plain}"
+    fi
+    pause_enter
     ;;
 
   "13")
