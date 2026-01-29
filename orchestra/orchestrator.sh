@@ -166,14 +166,16 @@ run_loop() {
   mkfifo "$log_fifo"
   if command -v logread >/dev/null 2>&1; then
     logread -f -e "$LOGREAD_FILTER" > "$log_fifo" &
+    log_source_pid=$!
+    echo "$log_source_pid" > "$LOGREAD_PID_FILE"
   elif command -v journalctl >/dev/null 2>&1; then
     journalctl -f -u zapret2 > "$log_fifo" &
+    log_source_pid=$!
+    echo "$log_source_pid" > "$LOGREAD_PID_FILE"
   else
-    log "orchestrator: no syslog source found"
-    exit 1
+    log "orchestrator: no syslog source found (idle mode)"
+    log_source_pid=""
   fi
-  log_source_pid=$!
-  echo "$log_source_pid" > "$LOGREAD_PID_FILE"
 
   cleanup_run() {
     if [ -n "${log_source_pid:-}" ]; then
@@ -189,6 +191,12 @@ run_loop() {
   current_strategy=""
   current_proto="tls"
   current_profile=""
+
+  if [ -z "${log_source_pid:-}" ]; then
+    while true; do
+      sleep 60
+    done
+  fi
 
   while IFS= read -r line; do
     case "$line" in
