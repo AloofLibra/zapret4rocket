@@ -269,8 +269,8 @@ NFQWS2_OPT="
 --lua-desync=fakedsplit:pos=1:repeats=8:tcp_ack=-66000:tcp_ts_up:ip_autottl=-1,3-20:ip6_autottl=-1,3-20:strategy=38
 --lua-desync=fake:blob=tls_google:repeats=6:tcp_md5:strategy=39
 --lua-desync=multisplit:payload=tls_client_hello:repeats=6:tcp_md5:strategy=40
---lua-desync=fake:blob=fakedefaulttls:repeats=1:strategy=41 --lua-desync=tcp_ts=-1000:strategy=41
---lua-desync=fake:blob=maxru:repeats=1:strategy=42 --lua-desync=tcp_ts=-1000:strategy=42
+--lua-desync=fake:blob=fakedefaulttls:tcp_ts=-1000:repeats=1:strategy=41
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=42
 
 --new
 
