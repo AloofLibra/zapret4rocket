@@ -269,14 +269,6 @@ NFQWS2_OPT="
 --lua-desync=fakedsplit:pos=1:repeats=8:tcp_ack=-66000:tcp_ts_up:ip_autottl=-1,3-20:ip6_autottl=-1,3-20:strategy=38
 --lua-desync=fake:blob=tls_google:repeats=6:tcp_md5:strategy=39
 --lua-desync=multisplit:payload=tls_client_hello:repeats=6:tcp_md5:strategy=40
---lua-desync=fake:blob=fake_default_tls:repeats=6:ip_ttl=1:ip6_ttl=1:tcp_ack=-66000:tls_mod=rnd,dupsid,sni=www.google.com:strategy=41 --lua-desync=tls_multisplit_sni:seqovl=211:strategy=41
---lua-desync=fake:blob=fake_default_tls:repeats=6:ip_ttl=1:ip6_ttl=1:tcp_ack=-66000:tls_mod=rnd,dupsid,sni=www.google.com:strategy=42 --lua-desync=tls_multisplit_sni:seqovl=625:strategy=42
---lua-desync=fake:blob=fake_default_tls:repeats=6:ip_ttl=1:ip6_ttl=1:tcp_ack=-66000:tls_mod=rnd,dupsid,sni=www.google.com:strategy=43 --lua-desync=multisplit_tls:seqovl=211:strategy=43
---lua-desync=fake:blob=fake_default_tls:repeats=6:ip_ttl=1:ip6_ttl=1:tcp_ack=-66000:tls_mod=rnd,dupsid,sni=www.google.com:strategy=44 --lua-desync=multisplit_tls:seqovl=625:strategy=44
---lua-desync=fake:blob=fake_default_tls:repeats=6:ip_ttl=4:ip6_ttl=4:tcp_ack=-66000:tls_mod=rnd,dupsid,sni=www.google.com:strategy=45 --lua-desync=multisplit_tls:seqovl=625:strategy=45
---lua-desync=fake:blob=fake_default_tls:repeats=6:tcp_ack=-66000:tls_mod=rnd,dupsid,sni=www.google.com:strategy=46 --lua-desync=multisplit_tls:seqovl=211:strategy=46
---lua-desync=multisplit_tls:payload=tls_client_hello:seqovl=680:sni=www.google.com:tls_rnd:tls_dupsid:pos=2:strategy=47
---lua-desync=multisplit_tls:payload=tls_client_hello:seqovl=650:sni=www.google.com:tls_rnd:tls_dupsid:pos=2:strategy=48
 
 --new
 
