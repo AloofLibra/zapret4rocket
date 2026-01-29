@@ -252,6 +252,32 @@ NFQWS2_OPT="
 --lua-desync=fakeddisorder:pos=10,midsld:seqovl=336:seqovl_pattern=maxru:pattern=google_www:tcp_seq=0:tcp_ack=-66000:badsum:strategy=22
 --lua-desync=multisplit:pos=1,sniext+1:seqovl=1:strategy=23
 
+--lua-desync=fakedsplit:pattern=tls4:pos=midsld-1,1:tcp_ack=-66000:tcp_ts_up:ip_autottl=-1,3-20:ip6_autottl=-1,3-20:strategy=24
+--lua-desync=fake:blob=fake_default_tls:ip_ttl=1:ip6_ttl=1:ip_autottl=4,3-20:ip6_autottl=4,3-20:tls_mod=rnd,rndsni,padencap:strategy=25
+--lua-desync=fake:blob=fake_default_tls:tcp_flags_unset=ack:tls_mod=rnd,rndsni,padencap:strategy=26
+--lua-desync=fakeddisorder:pos=midsld:tcp_flags_unset=ack:strategy=27
+--lua-desync=fake:blob=fake_default_tls:ip_ttl=1:ip6_ttl=1:tls_mod=rnd,rndsni,padencap:strategy=28
+--lua-desync=multisplit:payload=tls_client_hello:pos=1,midsld:strategy=29
+--lua-desync=multisplit:payload=tls_client_hello:pos=1:repeats=10:tcp_ack=-66000:tcp_ts_up:ip_ttl=4:ip6_ttl=4:strategy=30
+--lua-desync=fake:blob=tls_google:repeats=6:tcp_ack=-66000:tcp_ts_up:strategy=31 --lua-desync=multisplit:strategy=31
+--lua-desync=fake:blob=tls_sber:repeats=6:ip_ttl=1:ip6_ttl=1:ip_autottl=5,3-20:ip6_autottl=5,3-20:strategy=32
+--lua-desync=fake:blob=tls_google:repeats=6:tcp_ack=-66000:tcp_ts_up:ip_autottl=2,3-20:ip6_autottl=2,3-20:strategy=33
+--lua-desync=fake:blob=tls4:ip_ttl=4:ip6_ttl=4:strategy=34
+--lua-desync=multisplit:payload=tls_client_hello:pos=sniext:seqovl=1:strategy=35
+--lua-desync=fake:blob=tls_google:ip_ttl=2:ip6_ttl=2:strategy=36
+--lua-desync=multidisorder:payload=tls_client_hello:pos=3:strategy=37
+--lua-desync=fakedsplit:pos=1:repeats=8:tcp_ack=-66000:tcp_ts_up:ip_autottl=-1,3-20:ip6_autottl=-1,3-20:strategy=38
+--lua-desync=fake:blob=tls_google:repeats=6:tcp_md5:strategy=39
+--lua-desync=multisplit:payload=tls_client_hello:repeats=6:tcp_md5:strategy=40
+--lua-desync=fake:blob=fake_default_tls:repeats=6:ip_ttl=1:ip6_ttl=1:tcp_ack=-66000:tls_mod=rnd,dupsid,sni=www.google.com:strategy=41 --lua-desync=tls_multisplit_sni:seqovl=211:strategy=41
+--lua-desync=fake:blob=fake_default_tls:repeats=6:ip_ttl=1:ip6_ttl=1:tcp_ack=-66000:tls_mod=rnd,dupsid,sni=www.google.com:strategy=42 --lua-desync=tls_multisplit_sni:seqovl=625:strategy=42
+--lua-desync=fake:blob=fake_default_tls:repeats=6:ip_ttl=1:ip6_ttl=1:tcp_ack=-66000:tls_mod=rnd,dupsid,sni=www.google.com:strategy=43 --lua-desync=multisplit_tls:seqovl=211:strategy=43
+--lua-desync=fake:blob=fake_default_tls:repeats=6:ip_ttl=1:ip6_ttl=1:tcp_ack=-66000:tls_mod=rnd,dupsid,sni=www.google.com:strategy=44 --lua-desync=multisplit_tls:seqovl=625:strategy=44
+--lua-desync=fake:blob=fake_default_tls:repeats=6:ip_ttl=4:ip6_ttl=4:tcp_ack=-66000:tls_mod=rnd,dupsid,sni=www.google.com:strategy=45 --lua-desync=multisplit_tls:seqovl=625:strategy=45
+--lua-desync=fake:blob=fake_default_tls:repeats=6:tcp_ack=-66000:tls_mod=rnd,dupsid,sni=www.google.com:strategy=46 --lua-desync=multisplit_tls:seqovl=211:strategy=46
+--lua-desync=multisplit_tls:payload=tls_client_hello:seqovl=680:sni=www.google.com:tls_rnd:tls_dupsid:pos=2:strategy=47
+--lua-desync=multisplit_tls:payload=tls_client_hello:seqovl=650:sni=www.google.com:tls_rnd:tls_dupsid:pos=2:strategy=48
+
 --new
 
 #Отдельные стратегии для TCP_Discord
