@@ -282,106 +282,6 @@ toggle_hostlist_mode() {
   done
 }
 
-orchestra_show_switches() {
-  local lines=400
-  local view_mode=""
-  read -re -p "1 - текущие стратегии, 2 - только locked: " view_mode
-  if [ "$view_mode" != "2" ]; then
-    view_mode="1"
-  fi
-  local profile_filter=""
-  if [ "$view_mode" = "1" ]; then
-    read -re -p "Профиль (Enter - все): " profile_filter
-  fi
-
-  local awk_script='
-    /desync profile/ {
-      if (match($0, /desync profile[[:space:]=:#]*([^ ]+)/, m)) {
-        cur = m[1]
-      }
-    }
-    /using cached desync profile/ {
-      if (match($0, /using cached desync profile[[:space:]]+([0-9]+)/, m)) {
-        cur = m[1]
-        seen[cur] = 1
-      }
-    }
-    /autostate\./ {
-      if (match($0, /autostate\.([0-9]+)\./, m)) {
-        cur = m[1]
-        seen[cur] = 1
-      }
-    }
-    /lua '\''circular_locked_/ {
-      if (match($0, /circular_locked_([0-9]+)_/, m)) {
-        cur = m[1]
-        seen[cur] = 1
-      }
-    }
-    /profile=/ {
-      if (match($0, /profile=([A-Za-z0-9_.-]+)/, m)) {
-        cur = m[1]
-        seen[cur] = 1
-      }
-    }
-    /current strategy/ {
-      if (match($0, /current strategy[[:space:]]+([0-9]+)/, m)) {
-        if (cur != "") {
-          last[cur] = m[1]
-          seen[cur] = 1
-        }
-      }
-    }
-    END {
-      for (p in seen) {
-        if (pf == "" || p == pf) {
-          if (last[p] != "") {
-            print p "\t" last[p]
-          } else {
-            print p "\t" "n/a"
-          }
-          found = 1
-        }
-      }
-      if (!found) {
-        print "Нет данных по профилю"
-      }
-    }
-  '
-
-  if [ "$view_mode" = "2" ]; then
-    local manual_file="/opt/zapret2/extra_strats/cache/orchestra/locked.tsv"
-    if [ -s "$manual_file" ]; then
-      echo "MANUAL_LOCKED:"
-      cat "$manual_file" | sort
-    else
-      echo "MANUAL_LOCKED: пусто"
-    fi
-    return
-  fi
-
-  local switch_file="/tmp/strategy_switches.log"
-  if [ -s "$switch_file" ]; then
-    if [ -n "$profile_filter" ]; then
-      grep -F "profile=${profile_filter}" "$switch_file" | tail -n 3
-    else
-      tail -n 3 "$switch_file"
-    fi
-    return
-  fi
-
-  if command -v logread >/dev/null 2>&1; then
-    logread | tail -n "$lines" | awk -v pf="$profile_filter" "$awk_script" | sort
-    return
-  fi
-
-  if command -v journalctl >/dev/null 2>&1; then
-    journalctl -u zapret2 --no-pager | tail -n "$lines" | awk -v pf="$profile_filter" "$awk_script" | sort
-    return
-  fi
-
-  echo "Нет logread/journalctl для просмотра логов."
-}
 
 change_user() {
    if /opt/zapret2/nfq2/nfqws2 --dry-run --user="nobody" 2>&1 | grep -q "queue"; then
@@ -894,7 +794,6 @@ Enter (без цифр) - переустановка/обновление zapret
 12. Режим фильтра hostlist/autohostlist. Сейчас: '"${plain}"'['"$(hostlist_mode_text)"']'"${yellow}"'
 13. Активировать доступ в меню через браузер (~3мб места)
 14. Провайдер
-16. Показать переключения стратегий (последние строки логов)
 777. Активировать zeefeer premium (Нажимать только Valery ProD, avg97, Xoz, GeGunT, blagodarenya, mikhyan, Xoz, andric62, Whoze, Necronicle, Andrei_5288515371, Nomand, Dina_turat, Nergalss, Александру, АлександруП, vecheromholodno, ЕвгениюГ, Dyadyabo, skuwakin, izzzgoy, Grigaraz, Reconnaissance, comandante1928, umad, rudnev2028, rutakote, railwayfx, vtokarev1604, Grigaraz, a40letbezurojaya и subzeero452 и остальным поддержавшим проект. Но если очень хочется - можно нажать и другим)\033[0m'
     if [[ -f "$PREMIUM_FLAG" ]]; then
       echo -e "${red}999. Секретный пункт. Нажимать на свой страх и риск${plain}"
@@ -926,11 +825,6 @@ Enter (без цифр) - переустановка/обновление zapret
 
   "1")
     strategies_submenu
-    ;;
-
-  "16")
-    orchestra_show_switches
-    pause_enter
     ;;
 
   "2")
