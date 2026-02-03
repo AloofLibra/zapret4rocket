@@ -83,17 +83,13 @@ NFQWS2_UDP_PKT_IN=3
 NFQWS2_OPT="
 --debug=syslog
 
---lua-init=@/opt/zapret2/lua/strategy-lock-manager.lua
---lua-init=@/opt/zapret2/lua/combined-detector.lua
---lua-init=@/opt/zapret2/lua/domain-grouping.lua
---lua-init=@/opt/zapret2/lua/silent-drop-detector.lua
 #Стратегии для YT
 --qnum 300 --filter-tcp=443 --filter-l7=tls
 --hostlist=/opt/zapret2/extra_strats/TCP_YT_list.txt 
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello  
 --lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 
---in-range=-s32768 --lua-desync=circular_quality:key=1:retrans=2:maxseq=16384:inseq=8192:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector
+--in-range=-s32768 --lua-desync=circular_locked:key=1
 --in-range=x 
 --blob=maxru:@/opt/zapret2/files/fake/tls_clienthello_max_ru.bin
 --blob=google_www:@/opt/zapret2/files/fake/tls_clienthello_www_google_com.bin
@@ -150,7 +146,7 @@ NFQWS2_OPT="
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello 
 --lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 
---in-range=-s32768 --lua-desync=circular_quality:key=2:retrans=2:maxseq=16384:inseq=8192:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector
+--in-range=-s32768 --lua-desync=circular_locked:key=2
 --in-range=x 
 --payload=tls_client_hello,http_req
 --lua-desync=multidisorder:pos=1,midsld:strategy=1
@@ -205,7 +201,7 @@ NFQWS2_OPT="
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello  
 --lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 
---in-range=-s32768 --lua-desync=circular_quality:key=3:retrans=2:maxseq=16384:inseq=8192:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector
+--in-range=-s32768 --lua-desync=circular_locked:key=3
 --in-range=x 
 --payload=tls_client_hello,http_req
 --lua-desync=multidisorder:pos=1,midsld:strategy=1
@@ -279,7 +275,7 @@ NFQWS2_OPT="
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello 
 --lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 
---in-range=-s32768 --lua-desync=circular_quality:key=4:retrans=2:maxseq=16384:inseq=8192:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector
+--in-range=-s32768 --lua-desync=circular_locked:key=4
 --in-range=x 
 --payload=tls_client_hello,discord_ip_discovery 
 --lua-desync=fake:blob=maxru:tcp_seq=-3000:repeats=1:strategy=1 --lua-desync=fake:blob=fake_default_tls:tcp_seq=-3000:tls_mod=rnd,dupsid:repeats=1:strategy=1
@@ -292,7 +288,7 @@ NFQWS2_OPT="
 --filter-udp=443 --hostlist=/opt/zapret2/extra_strats/UDP_YT_list.txt
 --in-range=-d100
 --out-range=-d100
---lua-desync=circular_quality:key=5:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector:udp_out=6:udp_in=0 
+--lua-desync=circular_locked:key=5 
 --in-range=x
 --payload=quic_initial
 --blob=quic_google:@/opt/zapret2/files/fake/quic_initial_www_google_com.bin
@@ -319,7 +315,7 @@ NFQWS2_OPT="
 --filter-l7=discord,stun
 --in-range=-d100
 --out-range=-d100
---lua-desync=circular_quality:key=6:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector
+--lua-desync=circular_locked:key=6
 --payload=quic_initial,discord_ip_discovery 
 --blob=fake_quic_www_google:/opt/zapret2/files/fake/quic_initial_www_google_com.bin 
 --lua-desync=fake:blob=0x00000000000000000000000000000000:repeats=2:out_range=-d10:strategy=1
