@@ -55,12 +55,6 @@ if [ "$missing_libs" -ne 0 ]; then
   fi
 fi
 
-# Проверяем оркестратор и locked.lua, при отсутствии пробуем скачать из репозитория
-if [ ! -s "/opt/zapret2/extra_strats/cache/orchestra/orchestrator.sh" ] || [ ! -s "/opt/zapret2/lua/locked.lua" ]; then
-  echo "Не найдены orchestrator.sh или locked.lua. Пытаюсь скачать из репозитория..."
-  orchestra_update_from_repo || true
-fi
-
 #___Сначала идут анонсы функций____
 
 # UI helpers (пауза/печать пунктов меню/совместимость старого кода)
@@ -213,6 +207,12 @@ orchestra_update_from_repo() {
   chmod +x "$ORCH_SCRIPT"
   echo -e "${green}Оркестратор обновлен из репозитория.${plain}"
 }
+
+# Проверяем оркестратор и locked.lua, при отсутствии пробуем скачать из репозитория
+if [ ! -s "$ORCH_SCRIPT" ] || [ ! -s "$ORCH_LUA_LOCKED" ]; then
+  echo "Не найдены orchestrator.sh или locked.lua. Пытаюсь скачать из репозитория..."
+  orchestra_update_from_repo || true
+fi
 
 orchestra_start() {
   touch "$ORCH_ENABLED_FLAG"
