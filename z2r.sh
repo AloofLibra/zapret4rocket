@@ -55,6 +55,12 @@ if [ "$missing_libs" -ne 0 ]; then
   fi
 fi
 
+# Проверяем оркестратор и locked.lua, при отсутствии пробуем скачать из репозитория
+if [ ! -s "/opt/zapret2/extra_strats/cache/orchestra/orchestrator.sh" ] || [ ! -s "/opt/zapret2/lua/locked.lua" ]; then
+  echo "Не найдены orchestrator.sh или locked.lua. Пытаюсь скачать из репозитория..."
+  orchestra_update_from_repo || true
+fi
+
 #___Сначала идут анонсы функций____
 
 # UI helpers (пауза/печать пунктов меню/совместимость старого кода)
@@ -173,8 +179,6 @@ ORCH_DIR="/opt/zapret2/extra_strats/cache/orchestra"
 ORCH_SCRIPT="$ORCH_DIR/orchestrator.sh"
 ORCH_ENABLED_FLAG="$ORCH_DIR/enabled"
 ORCH_LUA_LOCKED="/opt/zapret2/lua/locked.lua"
-ORCH_MODE_AUTO="auto"
-ORCH_MODE_MANUAL="manual"
 
 orchestra_update_from_repo() {
   local url="https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/orchestra/orchestrator.sh"
@@ -208,84 +212,6 @@ orchestra_update_from_repo() {
   mv "$tmp" "$ORCH_SCRIPT"
   chmod +x "$ORCH_SCRIPT"
   echo -e "${green}Оркестратор обновлен из репозитория.${plain}"
-}
-
-orchestra_mode_current() {
-  local cfg="/opt/zapret2/config"
-  if [ -f "$cfg" ] && grep -q "circular_quality" "$cfg"; then
-    echo "$ORCH_MODE_AUTO"
-  else
-    echo "$ORCH_MODE_MANUAL"
-  fi
-}
-
-orchestra_config_set_mode() {
-  local cfg="$1"
-  local mode="$2"
-  local tmp="${cfg}.tmp"
-
-  [ -f "$cfg" ] || return 0
-
-  if [ "$mode" = "$ORCH_MODE_AUTO" ]; then
-    # Switch to auto (circular_quality) and inject detectors if missing.
-    sed -E \
-      -e 's/--lua-desync=circular_locked:/--lua-desync=circular_quality:/g' \
-      -e 's/:failure_detector=[^:[:space:]]+//g' \
-      -e 's/:success_detector=[^:[:space:]]+//g' \
-      -e 's/(--lua-desync=circular_quality:[^[:space:]]*)/\1:failure_detector=combined_silent_drop_detector:success_detector=combined_success_detector/g' \
-      "$cfg" > "$tmp" && mv "$tmp" "$cfg"
-
-    # Ensure required lua-init lines exist (insert before first strategy block).
-    if ! grep -q "lua/strategy-lock-manager.lua" "$cfg"; then
-      awk '
-        /#Стратегии для YT/ && !added {
-          print "--lua-init=@/opt/zapret2/lua/strategy-lock-manager.lua"
-          print "--lua-init=@/opt/zapret2/lua/combined-detector.lua"
-          print "--lua-init=@/opt/zapret2/lua/domain-grouping.lua"
-          print "--lua-init=@/opt/zapret2/lua/silent-drop-detector.lua"
-          added=1
-        }
-        {print}
-      ' "$cfg" > "$tmp" && mv "$tmp" "$cfg"
-    fi
-  else
-    # Switch to manual (circular_locked) and strip detector args.
-    sed -E \
-      -e 's/--lua-desync=circular_quality:/--lua-desync=circular_locked:/g' \
-      -e 's/:failure_detector=combined_silent_drop_detector//g' \
-      -e 's/:success_detector=combined_success_detector//g' \
-      "$cfg" > "$tmp" && mv "$tmp" "$cfg"
-  fi
-
-  # Make UDP failure detection less aggressive for UDP profiles (keys 5 and 6).
-  awk '
-    {
-      if ($0 ~ /--lua-desync=circular_/ && $0 ~ /:key=5(\b|:)/ && $0 !~ /udp_out=/) {
-        $0 = $0 ":udp_out=6:udp_in=0"
-      } else if ($0 ~ /--lua-desync=circular_/ && $0 ~ /:key=6(\b|:)/ && $0 !~ /udp_out=/) {
-        $0 = $0 ":udp_out=6:udp_in=0"
-      } else if ($0 ~ /--lua-desync=circular_/ && $0 ~ /:key=1(\b|:)/ && $0 !~ /tcp_out=/) {
-        $0 = $0 ":tcp_out=6:tcp_in=1"
-      }
-      print
-    }
-  ' "$cfg" > "$tmp" && mv "$tmp" "$cfg"
-
-  # Ensure TLS ServerHello is included in payload filters for TCP profiles.
-  awk '
-    {
-      if ($0 ~ /--payload=/ && $0 ~ /tls_client_hello/ && $0 !~ /tls_server_hello/) {
-        sub(/--payload=/, "--payload=tls_server_hello,", $0)
-      }
-      print
-    }
-  ' "$cfg" > "$tmp" && mv "$tmp" "$cfg"
-}
-
-orchestra_set_mode() {
-  local mode="$1"
-  orchestra_config_set_mode "/opt/zapret2/config" "$mode"
-  orchestra_config_set_mode "/opt/zapret2/config.default" "$mode"
 }
 
 orchestra_start() {
@@ -386,12 +312,6 @@ orchestra_show_switches() {
         seen[cur] = 1
       }
     }
-    /lua '\''circular_quality_/ {
-      if (match($0, /circular_quality_([0-9]+)_/, m)) {
-        cur = m[1]
-        seen[cur] = 1
-      }
-    }
     /lua '\''circular_locked_/ {
       if (match($0, /circular_locked_([0-9]+)_/, m)) {
         cur = m[1]
@@ -431,18 +351,11 @@ orchestra_show_switches() {
 
   if [ "$view_mode" = "2" ]; then
     local manual_file="/opt/zapret2/extra_strats/cache/orchestra/locked.tsv"
-    local auto_file="/opt/zapret2/extra_strats/cache/orchestra/auto_locked.tsv"
     if [ -s "$manual_file" ]; then
       echo "MANUAL_LOCKED:"
       cat "$manual_file" | sort
     else
       echo "MANUAL_LOCKED: пусто"
-    fi
-    if [ -s "$auto_file" ]; then
-      echo "AUTO_LOCKED:"
-      cat "$auto_file" | sort
-    else
-      echo "AUTO_LOCKED: пусто"
     fi
     return
   fi
@@ -630,8 +543,6 @@ get_repo() {
   mkdir -p /opt/zapret2/lists /opt/zapret2/extra_strats /opt/zapret2/extra_strats/cache
   mkdir -p /opt/zapret2/extra_strats/cache/orchestra
   chmod 777 /opt/zapret2/extra_strats/cache/orchestra 2>/dev/null || true
-  touch /opt/zapret2/extra_strats/cache/orchestra/auto_locked.tsv 2>/dev/null || true
-  chmod 666 /opt/zapret2/extra_strats/cache/orchestra/auto_locked.tsv 2>/dev/null || true
   orchestra_update_from_repo || true
   for listfile in cloudflare-ipset.txt cloudflare-ipset_v6.txt netrogat.txt russia-discord.txt russia-youtube-rtmps.txt russia-youtube.txt russia-youtubeQ.txt tg_cidr.txt; do
     curl -L -o /opt/zapret2/lists/$listfile https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z2r/lists/$listfile
@@ -642,10 +553,6 @@ get_repo() {
   curl -L -o /opt/zapret2/extra_strats/TCP_YT_list.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/TCP/YT/List.txt
   curl -L -o /opt/zapret2/extra_strats/TCP_GV_list.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/TCP/GV/List.txt
   curl -L -o /opt/zapret2/extra_strats/TCP_Discord.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/TCP/RKN/Discord.txt
-  curl -L -o /opt/zapret2/lua/strategy-lock-manager.lua https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/lua/strategy-lock-manager.lua
-  curl -L -o /opt/zapret2/lua/combined-detector.lua https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/lua/combined-detector.lua
-  curl -L -o /opt/zapret2/lua/domain-grouping.lua https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/lua/domain-grouping.lua
-  curl -L -o /opt/zapret2/lua/silent-drop-detector.lua https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/lua/silent-drop-detector.lua
   touch /opt/zapret2/lists/autohostlist.txt
   if [ -d /opt/extra_strats ]; then
     rm -rf /opt/zapret2/extra_strats
@@ -987,7 +894,6 @@ Enter (без цифр) - переустановка/обновление zapret
 12. Режим фильтра hostlist/autohostlist. Сейчас: '"${plain}"'['"$(hostlist_mode_text)"']'"${yellow}"'
 13. Активировать доступ в меню через браузер (~3мб места)
 14. Провайдер
-15. Режим оркестратора (ручной/авто). Сейчас: '"${plain}"'['"$(orchestra_mode_current)"']'"${yellow}"'
 16. Показать переключения стратегий (последние строки логов)
 777. Активировать zeefeer premium (Нажимать только Valery ProD, avg97, Xoz, GeGunT, blagodarenya, mikhyan, Xoz, andric62, Whoze, Necronicle, Andrei_5288515371, Nomand, Dina_turat, Nergalss, Александру, АлександруП, vecheromholodno, ЕвгениюГ, Dyadyabo, skuwakin, izzzgoy, Grigaraz, Reconnaissance, comandante1928, umad, rudnev2028, rutakote, railwayfx, vtokarev1604, Grigaraz, a40letbezurojaya и subzeero452 и остальным поддержавшим проект. Но если очень хочется - можно нажать и другим)\033[0m'
     if [[ -f "$PREMIUM_FLAG" ]]; then
@@ -1020,23 +926,6 @@ Enter (без цифр) - переустановка/обновление zapret
 
   "1")
     strategies_submenu
-    ;;
-
-  "15")
-    current_mode="$(orchestra_mode_current)"
-    if [ "$current_mode" = "$ORCH_MODE_MANUAL" ]; then
-      orchestra_set_mode "$ORCH_MODE_AUTO"
-      echo -e "${green}Режим оркестратора: авто (circular_quality)${plain}"
-    else
-      orchestra_set_mode "$ORCH_MODE_MANUAL"
-      echo -e "${green}Режим оркестратора: ручной (circular_locked)${plain}"
-    fi
-    if pidof nfqws2 >/dev/null; then
-      "$ZAPRET2_INIT" restart
-      orchestra_start
-      echo -e "${green}zapret2 перезапущен для применения режима${plain}"
-    fi
-    pause_enter
     ;;
 
   "16")
@@ -1072,8 +961,6 @@ Enter (без цифр) - переустановка/обновление zapret
     orchestra_update_from_repo
     mkdir -p /opt/zapret2/extra_strats/cache/orchestra
     chmod 777 /opt/zapret2/extra_strats/cache/orchestra 2>/dev/null || true
-    touch /opt/zapret2/extra_strats/cache/orchestra/auto_locked.tsv 2>/dev/null || true
-    chmod 666 /opt/zapret2/extra_strats/cache/orchestra/auto_locked.tsv 2>/dev/null || true
     if [ -x "$ORCH_SCRIPT" ]; then
       if ps w | grep -F "$ORCH_SCRIPT run" | grep -v grep >/dev/null 2>&1; then
         orchestra_stop
