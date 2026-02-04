@@ -761,19 +761,15 @@ get_menu() {
     echo ""
     
     echo -e '
-'"${red}"'      *
-     ***            '"${Fcyan}"'by Dmitriy Utkin:
-      *
-'"${green}"'     /|\             '"${plain}"'.   .      .
-'"${green}"'    //|\\\             '"${plain}"'.     '"${Fred}"'* '"${plain}"'.   .
-'"${green}"'   ///|\\\\\                 '"${green}"'/ \  '"${plain}"'.
-'"${green}"'  ////|\\\\\\\           '"${plain}"'.   '"${green}"'/ '"${Fcyan}"'* '"${green}"'\      '"${plain}"'.
-'"${green}"'   ///|\\\\\\               '"${green}"'/  .  \   '"${plain}"'.
-'"${green}"'  ////|\\\\\\\\         '"${plain}"'.   '"${green}"'/ '"${Fpink}"'* . '"${Fyellow}"'* '"${green}"'\
-'"${green}"' /////|\\\\\\\\\\           '"${green}"'/  .   .  \  '"${plain}"'.
-'"${green}"'  ////|\\\\\\\\\      '"${plain}"'.   '"${green}"'/ '"${Fcyan}"'* . '"${plain}"'* . '"${Fred}"'* '"${green}"'\   '"${plain}"'.
-'"${green}"' /////|\\\\\\\\\\\        '"${green}"'/_____________\
-'"${green}"'//////|\\\\\\\\\\\\\      '"${plain}"'.     '"${green}"'[___]   '"${plain}"'.  .
+'"${Fcyan}"'      +-----------------------------------------------------------------+
+'"${Fyellow}"'           _____     ____ │  '"${Fgreen}"'1 MB / 10 GB'"${Fyellow}"'        '"${Fpink}"'⏳'"${Fyellow}"'  ETA: КТТС         │
+'"${Fyellow}"'          /      \  |  o |│  [====>          ]                         │
+'"${Fyellow}"'         |        |/ ___\|│     '"${Fpink}"'(_o_)'"${Fyellow}"' ---->  '"${Fcyan}"'z a t o r'"${Fyellow}"'  <---- '"${Fpink}"'(_o_)'"${Fyellow}"'    │
+'"${Fyellow}"'         |_________/      │                                            │
+'"${Fyellow}"'         |_|_| |_|_|      │  '"${Fgreen}"'speed: 0.0001 Mb/s'"${Fyellow}"'   stability: возможно  │
+'"${Fcyan}"'      +-----------------------------------------------------------------+
+'"${plain}"'
+
 '"Город/провайдер: ${plain}${PROVIDER_MENU}${yellow}"'
 '"${TITLE_MENU_LINE}"'
 \033[32mВыберите необходимое действие:\033[33m
