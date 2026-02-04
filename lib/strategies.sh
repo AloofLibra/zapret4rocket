@@ -176,15 +176,17 @@ orch_profile_try() {
 }
 
 get_orchestra_locks_info() {
-    local p1_tls="" p1_http="" p2_tls="" p3_tls="" p4_tls="" p5_udp=""
+    local p1_tls="" p1_http="" p2_tls="" p3_tls="" p4_tls="" p5_udp="" p6_udp="" p7_tls=""
     p1_tls="$(orch_locked_get 1 tls)"
     p1_http="$(orch_locked_get 1 http)"
     p2_tls="$(orch_locked_get 2 tls)"
     p3_tls="$(orch_locked_get 3 tls)"
     p4_tls="$(orch_locked_get 4 tls)"
     p5_udp="$(orch_locked_get 5 udp)"
-    printf "P1(tls=%s,http=%s) P2(tls=%s) P3(tls=%s) P4(tls=%s) P5(udp=%s)" \
-        "${p1_tls:-0}" "${p1_http:-0}" "${p2_tls:-0}" "${p3_tls:-0}" "${p4_tls:-0}" "${p5_udp:-0}"
+    p6_udp="$(orch_locked_get 6 udp)"
+    p7_tls="$(orch_locked_get 7 tls)"
+    printf "P1(tls=%s,http=%s) P2(tls=%s) P3(tls=%s) P4(tls=%s) P5(udp=%s) P6(udp=%s) P7(tls=%s)" \
+        "${p1_tls:-0}" "${p1_http:-0}" "${p2_tls:-0}" "${p3_tls:-0}" "${p4_tls:-0}" "${p5_udp:-0}" "${p6_udp:-0}" "${p7_tls:-0}"
 }
 
 #Функция для функции подбора стратегий
