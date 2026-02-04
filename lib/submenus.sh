@@ -6,18 +6,28 @@ strategies_submenu() {
   while true; do
     local strategies_status
     strategies_status=$(get_orchestra_locks_info)
+    local p1_max p2_max p3_max p4_max p5_max p6_max p7_max
+    p1_max="$(orch_max_strategy_for_profile 1)"
+    p2_max="$(orch_max_strategy_for_profile 2)"
+    p3_max="$(orch_max_strategy_for_profile 3)"
+    p4_max="$(orch_max_strategy_for_profile 4)"
+    p5_max="$(orch_max_strategy_for_profile 5)"
+    p6_max="$(orch_max_strategy_for_profile 6)"
+    p7_max="$(orch_max_strategy_for_profile 7)"
     clear
 
     echo -e "${cyan}--- Управление стратегиями ---${plain}"
-    echo -e "${yellow}Выбор стратегии профиля (1-4, 0 или Enter для выхода)${plain}"
+    echo -e "${yellow}Выбор стратегии профиля (0 или Enter для выхода)${plain}"
     echo -e "  Текущие стратегии [${strategies_status}]"
     echo -e 
 
-    submenu_item "	1" "Профиль 1: TCP 80/443 (YouTube)" "tls+http"
-    submenu_item "	2" "Профиль 2: TCP 80/443 (Googlevideo)" "tls"
-    submenu_item "	3" "Профиль 3: TCP 80/443 (RKN)" "tls"
-    submenu_item "	4" "Профиль 4: TCP 80/443 (Discord)" "tls"
-    submenu_item "	5" "Профиль 5: UDP 443 (YouTube QUIC)" "udp"
+    submenu_item "	1" "Профиль 1: TCP 80/443 (YouTube) [${p1_max:-0}]" "tls+http"
+    submenu_item "	2" "Профиль 2: TCP 80/443 (Googlevideo) [${p2_max:-0}]" "tls"
+    submenu_item "	3" "Профиль 3: TCP 80/443 (RKN) [${p3_max:-0}]" "tls"
+    submenu_item "	4" "Профиль 4: TCP 80/443 (Discord) [${p4_max:-0}]" "tls"
+    submenu_item "	5" "Профиль 5: UDP 443 (YouTube QUIC) [${p5_max:-0}]" "udp"
+    submenu_item "	6" "Профиль 6: UDP Voice (Discord/STUN) [${p6_max:-0}]" "udp"
+    submenu_item "	7" "Профиль 7: MTProto/Telegram [${p7_max:-0}]" "tls"
     submenu_item "	0" "Назад"
     echo ""
 
@@ -39,6 +49,13 @@ strategies_submenu() {
       "5")
         echo -e "${yellow}Проверьте работоспособность в браузере.${plain}"
         orch_profile_try "5" "Профиль 5: UDP 443 (YouTube QUIC)" "udp" ""
+        ;;
+      "6")
+        echo -e "${yellow}Проверьте работоспособность в приложении.${plain}"
+        orch_profile_try "6" "Профиль 6: UDP Voice (Discord/STUN)" "udp" ""
+        ;;
+      "7")
+        orch_profile_try "7" "Профиль 7: MTProto/Telegram" "tls" "https://telegram.org/"
         ;;
       "0"|"")
         return
