@@ -70,15 +70,6 @@ api.cloudflareclient.com
 speedtest.net
 engage.cloudflareclient.com
 aws.amazon.com
-discord.com
-discord.gg
-discordapp.com
-discordapp.io
-discordapp.net
-discord.media
-discordcdn.com
-discordstatus.com
-discord-attachments-uploads-prd.storage.googleapis.com
 repack.me
 cloudflare.com
 ntc.party
