@@ -79,6 +79,27 @@ orch_max_strategy_for_profile() {
     local profile="$1"
     local cfg="/opt/zapret2/config"
     [ ! -f "$cfg" ] && cfg="/opt/zapret2/config.default"
+    if [ "$profile" = "8" ]; then
+        local fallback_max
+        fallback_max="$(awk '
+            BEGIN{inblk=0; max=0}
+            /^[[:space:]]*#Z2R_FALLBACK_BEGIN/ {inblk=1; next}
+            /^[[:space:]]*#Z2R_FALLBACK_END/ {inblk=0; exit}
+            inblk {
+                line=$0
+                while (match(line, /strategy=[0-9]+/)) {
+                    num=substr(line, RSTART+9, RLENGTH-9)+0
+                    if (num>max) max=num
+                    line=substr(line, RSTART+RLENGTH)
+                }
+            }
+            END{print max}
+        ' "$cfg")"
+        if [ -n "$fallback_max" ] && [ "$fallback_max" -gt 0 ]; then
+            echo "$fallback_max"
+            return
+        fi
+    fi
     awk -v pid="$profile" '
         BEGIN{inopt=0; prof=1; max=0}
         /^NFQWS2_OPT="/ {inopt=1}
