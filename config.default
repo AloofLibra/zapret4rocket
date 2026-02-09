@@ -117,10 +117,9 @@ NFQWS2_OPT="
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=21 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-1000:strategy=21
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:tls_mod=rnd,dupsid:repeats=1:strategy=22 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-1000:strategy=22
 --lua-desync=multisplit:blob=maxru:tcp_ts=-1000:pos=2:nodrop:repeats=1:strategy=23 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-100:strategy=23
-
-
-
-
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=24 --lua-desync=multisplit:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1:strategy=24
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=25 --lua-desync=multidisorder:pos=1,midsld:strategy=25
+--lua-desync=fake:blob=fake_default_tls:tcp_ts=-1000:repeats=1:strategy=26 --lua-desync=multisplit:pos=1,midsld:strategy=26
 
 --new
 
@@ -155,7 +154,9 @@ NFQWS2_OPT="
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=21 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-1000:strategy=21
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:tls_mod=rnd,dupsid:repeats=1:strategy=22 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-1000:strategy=22
 --lua-desync=multisplit:blob=maxru:tcp_ts=-1000:pos=2:nodrop:repeats=1:strategy=23 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-100:strategy=23
-
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=24 --lua-desync=multisplit:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1:strategy=24
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=25 --lua-desync=multidisorder:pos=1,midsld:strategy=25
+--lua-desync=fake:blob=fake_default_tls:tcp_ts=-1000:repeats=1:strategy=26 --lua-desync=multisplit:pos=1,midsld:strategy=26
 
 --new
 
@@ -190,7 +191,9 @@ NFQWS2_OPT="
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=21 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-1000:strategy=21
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:tls_mod=rnd,dupsid:repeats=1:strategy=22 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-1000:strategy=22
 --lua-desync=multisplit:blob=maxru:tcp_ts=-1000:pos=2:nodrop:repeats=1:strategy=23 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-100:strategy=23
-
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=24 --lua-desync=multisplit:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1:strategy=24
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=25 --lua-desync=multidisorder:pos=1,midsld:strategy=25
+--lua-desync=fake:blob=fake_default_tls:tcp_ts=-1000:repeats=1:strategy=26 --lua-desync=multisplit:pos=1,midsld:strategy=26
 
 --new
 
@@ -225,6 +228,10 @@ NFQWS2_OPT="
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=21 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-1000:strategy=21
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:tls_mod=rnd,dupsid:repeats=1:strategy=22 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-1000:strategy=22
 --lua-desync=multisplit:blob=maxru:tcp_ts=-1000:pos=2:nodrop:repeats=1:strategy=23 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-100:strategy=23
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=24 --lua-desync=multisplit:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1:strategy=24
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=25 --lua-desync=multidisorder:pos=1,midsld:strategy=25
+--lua-desync=fake:blob=fake_default_tls:tcp_ts=-1000:repeats=1:strategy=26 --lua-desync=multisplit:pos=1,midsld:strategy=26
+
 --new
 
 #Стратегии для UDP_YT
