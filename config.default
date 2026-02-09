@@ -194,7 +194,7 @@ NFQWS2_OPT="
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=24 --lua-desync=multisplit:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1:strategy=24
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=25 --lua-desync=multidisorder:pos=1,midsld:strategy=25
 --lua-desync=fake:blob=fake_default_tls:tcp_ts=-1000:repeats=1:strategy=26 --lua-desync=multisplit:pos=1,midsld:strategy=26
---payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tls_mod=rnd,dupsid,sni=www.google.com:tcp_ts=-1000:strategy=27 --lua-desync=multidisorder:pos=1,midsld,sniext+1,endhost-2,-10:seqovl=1:seqovl_pattern=tls_clienthello:tcp_ts_up:strategy=27 --payload=http_req --lua-desync=http_methodeol:badsum":strategy=27
+--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tls_mod=rnd,dupsid,sni=www.google.com:tcp_ts=-1000:strategy=27 --lua-desync=multidisorder:pos=1,midsld,sniext+1,endhost-2,-10:seqovl=1:seqovl_pattern=tls_clienthello:tcp_ts_up:strategy=27 --payload=http_req --lua-desync=http_methodeol:badsum:strategy=27
 
 
 --new
