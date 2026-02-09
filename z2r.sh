@@ -304,6 +304,7 @@ blockcheck2_run_summary() {
   local uuid_suffix=""
   local was_running=0 rc=0
   local pid=0 start_ts=0
+  local progress_file="/tmp/blockcheck2_progress_$$"
 
   if [ ! -x "$blockcheck_path" ]; then
     echo -e "${red}blockcheck2.sh не найден или не исполняемый: $blockcheck_path${plain}"
@@ -337,18 +338,36 @@ blockcheck2_run_summary() {
   echo -e "${yellow}Запускаю blockcheck2 (BATCH=1)...${plain}"
   start_ts="$(date +%s)"
   if [ -n "$domains_override" ]; then
-    CURL_HTTPS_GET=1 BATCH=1 DOMAINS="$domains_override" ZAPRET_BASE=/opt/zapret2 "$blockcheck_path" >"$log_file" 2>&1 &
+    CURL_HTTPS_GET=1 BATCH=1 DOMAINS="$domains_override" BC2_PROGRESS_FILE="$progress_file" ZAPRET_BASE=/opt/zapret2 "$blockcheck_path" >"$log_file" 2>&1 &
   else
-    CURL_HTTPS_GET=1 BATCH=1 ZAPRET_BASE=/opt/zapret2 "$blockcheck_path" >"$log_file" 2>&1 &
+    CURL_HTTPS_GET=1 BATCH=1 BC2_PROGRESS_FILE="$progress_file" ZAPRET_BASE=/opt/zapret2 "$blockcheck_path" >"$log_file" 2>&1 &
   fi
   pid=$!
   if [ "$pid" -gt 0 ]; then
     local spin='|/-\' idx=0 pct=0 elapsed=0 elapsed_fmt="" overrun_notice=0
+    local done=0 total=0 eta=0 eta_fmt=""
     while kill -0 "$pid" >/dev/null 2>&1; do
       elapsed=$(( $(date +%s) - start_ts ))
-      pct="$(blockcheck2_progress_percent "$elapsed")"
+      if [ -s "$progress_file" ]; then
+        read -r done total <"$progress_file"
+        if [ -n "$total" ] && [ "$total" -gt 0 ]; then
+          pct=$(( (done * 100) / total ))
+          if [ "$done" -gt 0 ]; then
+            eta=$(( (elapsed * (total - done)) / done ))
+            eta_fmt="$(blockcheck2_format_elapsed "$eta")"
+          else
+            eta_fmt="?"
+          fi
+        else
+          pct="$(blockcheck2_progress_percent "$elapsed")"
+          eta_fmt="?"
+        fi
+      else
+        pct="$(blockcheck2_progress_percent "$elapsed")"
+        eta_fmt="?"
+      fi
       elapsed_fmt="$(blockcheck2_format_elapsed "$elapsed")"
-      printf "\r${yellow}blockcheck2: %3s%% %s elapsed %s${plain}" "$pct" "${spin:$idx:1}" "$elapsed_fmt"
+      printf "\r${yellow}blockcheck2: %3s%% %s elapsed %s ETA %s${plain}" "$pct" "${spin:$idx:1}" "$elapsed_fmt" "$eta_fmt"
       if [ "$pct" -ge 100 ] && [ "$overrun_notice" -eq 0 ]; then
         echo -e "\n${yellow}Скрипт выполняется дольше обычного. Это ожидаемо. Дождитесь завершения работы скрипта.${plain}"
         echo -e "\n${yellow}И вообще 146% - не предел${plain}"
@@ -358,6 +377,7 @@ blockcheck2_run_summary() {
       sleep 1
     done
     wait "$pid" || rc=$?
+    rm -f "$progress_file" 2>/dev/null || true
     elapsed_fmt="$(blockcheck2_format_elapsed "$(( $(date +%s) - start_ts ))")"
     printf "\r${yellow}blockcheck2: 100%% done (elapsed %s)${plain}\n" "$elapsed_fmt"
   else
@@ -436,6 +456,103 @@ blockcheck2_get_uuid() {
     fi
   fi
   echo "$tel_uuid"
+}
+
+run_cdn_test() {
+  BIN_THR_BYTES=$((24*1024))
+  PARALLEL=6
+
+  GREEN='\033[0;32m'
+  RED='\033[0;31m'
+  YELLOW='\033[1;33m'
+  NC='\033[0m'
+
+  TESTS=(
+  "US.CF-01|🇺🇸 Cloudflare|$BIN_THR_BYTES|1|https://img.wzstats.gg/cleaver/gunFullDisplay"
+  "US.CF-02|🇺🇸 Cloudflare|104319|1|https://genshin.jmp.blue/characters/all#"
+  "US.CF-03|🇺🇸 Cloudflare|109863|1|https://api.frankfurter.dev/v1/2000-01-01..2002-12-31"
+  "US.CF-04|🇨🇦 Cloudflare|79655|1|https://www.bigcartel.com/"
+  "US.DO-01|🇺🇸 DigitalOcean|195612|2|https://genderize.io/"
+  "DE.HE-01|🇩🇪 Hetzner|$BIN_THR_BYTES|1|https://j.dejure.org/jcg/doctrine/doctrine_banner.webp"
+  "DE.HE-02|🇩🇪 Hetzner|162646|1|https://accesorioscelular.com/tienda/css/plugins.css"
+  "FI.HE-01|🇫🇮 Hetzner|$BIN_THR_BYTES|1|https://251b5cd9.nip.io/1MB.bin"
+  "FI.HE-02|🇫🇮 Hetzner|$BIN_THR_BYTES|1|https://nioges.com/libs/fontawesome/webfonts/fa-solid-900.woff2"
+  "FI.HE-03|🇫🇮 Hetzner|$BIN_THR_BYTES|1|https://5fd8bdae.nip.io/1MB.bin"
+  "FI.HE-04|🇫🇮 Hetzner|$BIN_THR_BYTES|1|https://5fd8bca5.nip.io/1MB.bin"
+  "FR.OVH-01|🇫🇷 OVH|75872|1|https://eu.api.ovh.com/console/rapidoc-min.js"
+  "FR.OVH-02|🇫🇷 OVH|$BIN_THR_BYTES|1|https://ovh.sfx.ovh/10M.bin"
+  "SE.OR-01|🇸🇪 Oracle|$BIN_THR_BYTES|1|https://oracle.sfx.ovh/10M.bin"
+  "DE.AWS-01|🇩🇪 AWS|$BIN_THR_BYTES|1|https://www.getscope.com/assets/fonts/fa-solid-900.woff2"
+  "US.AWS-01|🇺🇸 AWS|215419|1|https://corp.kaltura.com/wp-content/cache/min/1/wp-content/themes/airfleet/dist/styles/theme.css"
+  "US.GC-01|🇺🇸 Google Cloud|176277|1|https://api.usercentrics.eu/gvl/v3/en.json"
+  "US.FST-01|🇺🇸 Fastly|77597|1|https://www.jetblue.com/footer/footer-element-es2015.js"
+  "CA.FST-01|🇨🇦 Fastly|84086|1|https://ssl.p.jwpcdn.com/player/v/8.40.5/bidding.js"
+  "US.AKM-01|🇺🇸 Akamai|$BIN_THR_BYTES|1|https://www.roxio.com/static/roxio/images/products/creator/nxt9/call-action-footer-bg.jpg"
+  "PL.AKM-01|🇵🇱 Akamai|$BIN_THR_BYTES|1|https://media-assets.stryker.com/is/image/stryker/gateway_1?\$max_width_1410\$"
+  "US.CDN77-01|🇺🇸 CDN77|$BIN_THR_BYTES|1|https://cdn.eso.org/images/banner1920/eso2520a.jpg"
+  "FR.CNTB-01|🇫🇷 Contabo|$BIN_THR_BYTES|1|https://xdmarineshop.gr/index.php?route=index"
+  "NL.SW-01|🇳🇱 Scaleway|$BIN_THR_BYTES|1|https://www.velivole.fr/img/header.jpg"
+  "US.CNST-01|🇺🇸 Constant|$BIN_THR_BYTES|1|https://cdn.xuansiwei.com/common/lib/font-awesome/4.7.0/fontawesome-webfont.woff2?v=4.7.0"
+  )
+
+  check_one() {
+      IFS='|' read -r id provider thr times url <<< "$1"
+
+      total=0
+      code=0
+
+      for ((i=1;i<=times;i++)); do
+          read bytes code <<< $(curl -L -s \
+              -H "Range: bytes=0-${thr}" \
+              --connect-timeout 5 \
+              --max-time 5 \
+              -o /dev/null \
+              -w '%{size_download} %{http_code}' \
+              "$url")
+
+          total=$((total+bytes))
+      done
+
+      avg=$((total/times))
+
+      if (( avg >= thr )) && [[ "$code" =~ ^2|3 ]]; then
+          echo -e "${GREEN}$id OK${NC} ${avg}b [$provider]"
+          echo OK >> /tmp/cdn_ok
+      else
+          echo -e "${RED}$id FAIL${NC} ${avg}b code=$code [$provider]"
+          echo FAIL >> /tmp/cdn_fail
+      fi
+  }
+
+  export -f check_one
+  export BIN_THR_BYTES PARALLEL GREEN RED YELLOW NC
+
+  rm -f /tmp/cdn_ok /tmp/cdn_fail
+
+  pids_parallels=()
+  for test_parallel in "${TESTS[@]}"; do
+    check_one "$test_parallel" &
+    pids_parallels+=($!)
+
+    # ограничение параллельных задач
+    if [ "${#pids_parallels[@]}" -ge "$PARALLEL" ]; then
+      wait "${pids_parallels[0]}"
+      pids_parallels=("${pids_parallels[@]:1}")
+    fi
+  done
+
+  # ждём оставшиеся
+  for pid_parallel in "${pids_parallels[@]}"; do
+    wait "$pid_parallel"
+  done
+
+  OK_COUNT=$(wc -l < /tmp/cdn_ok 2>/dev/null)
+  FAIL_COUNT=$(wc -l < /tmp/cdn_fail 2>/dev/null)
+
+  echo
+  echo -e "${YELLOW}=== SUMMARY ===${NC}"
+  echo -e "${GREEN}OK:${NC} ${OK_COUNT:-0}"
+  echo -e "${RED}FAIL:${NC} ${FAIL_COUNT:-0}"
 }
 
 #Создаём папки и забираем файлы папок lists, fake, extra_strats, копируем конфиг, скрипты для войсов DS, WA, TG
@@ -775,6 +892,7 @@ get_menu() {
 \033[32mВыберите необходимое действие:\033[33m
 Enter (без цифр) - переустановка/обновление zapret2
 0. Выход
+001. CDN тест (test.sh)
 01. Проверить доступность сервисов (Тест не точен)
 1. Фиксация стратегии профиля (оркестратор). Текущие: '"${plain}"'[ '"${strategies_status}"' ]'"${yellow}"'
 2. Стоп/пере(запуск) zapret2 (сейчас: '"$(pidof nfqws2 >/dev/null && echo "${green}Запущен${yellow}" || echo "${red}Остановлен${yellow}")"' | оркестратор: '"${plain}"'['"$(orchestra_status_text)"']'"${yellow}"')
@@ -816,6 +934,11 @@ Enter (без цифр) - переустановка/обновление zapret
 
   "01")
     check_access_list
+    pause_enter
+    ;;
+
+  "001")
+    run_cdn_test
     pause_enter
     ;;
 
