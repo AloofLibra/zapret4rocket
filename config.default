@@ -227,8 +227,6 @@ NFQWS2_OPT="
 --lua-desync=multisplit:blob=maxru:tcp_ts=-1000:pos=2:nodrop:repeats=1:strategy=23 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-100:strategy=23
 --new
 
---new
-
 #Стратегии для UDP_YT
 --filter-udp=443 --hostlist=/opt/zapret2/extra_strats/UDP_YT_list.txt
 --in-range=-d100
