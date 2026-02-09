@@ -82,17 +82,19 @@ NFQWS2_UDP_PKT_IN=3
 # <HOSTLIST_NOAUTO> appends ipset/zapret-hosts-auto.txt as normal list
 NFQWS2_OPT="
 
+--lua-init=@/opt/zapret2/lua/locked.lua
+--blob=maxru:@/opt/zapret2/files/fake/tls_clienthello_max_ru.bin
+--blob=google_www:@/opt/zapret2/files/fake/tls_clienthello_www_google_com.bin
+--blob=tls4:@/opt/zapret2/files/fake/tls_clienthello_4.bin
+
 #Стратегии для YT
 --qnum 300 --filter-tcp=443 --filter-l7=tls
 --hostlist=/opt/zapret2/extra_strats/TCP_YT_list.txt 
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello  
---lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 
 --in-range=-s32768 --lua-desync=circular_locked:key=1
 --in-range=x 
---blob=maxru:@/opt/zapret2/files/fake/tls_clienthello_activated.bin
---blob=google_www:@/opt/zapret2/files/fake/tls_clienthello_www_google_com.bin
---payload=tls_client_hello
+--payload=tls_client_hello,http_req
 --lua-desync=multisplit:blob=maxru:tcp_seq=-3000:pos=2:nodrop:repeats=1:strategy=1
 --lua-desync=fake:blob=maxru:tcp_ack=-66000:tcp_ts_up:tls_mod=rnd,dupsid:repeats=1:strategy=2
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:tls_mod=rnd,dupsid:repeats=1:strategy=3
@@ -125,7 +127,6 @@ NFQWS2_OPT="
 --filter-tcp=443 --filter-l7=tls
 --hostlist-domains=googlevideo.com
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello 
---lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 
 --in-range=-s32768 --lua-desync=circular_locked:key=2
 --in-range=x 
@@ -159,14 +160,14 @@ NFQWS2_OPT="
 
 --new
 
-#Стратегии для RKN
---filter-tcp=80,443,2053,2083,2087,2096,8443 --filter-l7=http,tls 
---hostlist=/opt/zapret2/extra_strats/TCP_RKN_list.txt
---lua-init=@/opt/zapret2/lua/locked.lua
---out-range=-s34228 
---in-range=-s32768 --lua-desync=circular_locked:key=3
---in-range=x 
---payload=tls_client_hello
+  #Стратегии для RKN
+  --filter-tcp=80,443,2053,2083,2087,2096,8443 --filter-l7=tls
+  --hostlist=/opt/zapret2/extra_strats/TCP_RKN_list.txt
+  --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello
+  --out-range=-s34228
+  --in-range=-s32768 --lua-desync=circular_locked:key=3
+  --in-range=x
+  --payload=tls_client_hello,http_req
 --lua-desync=multisplit:blob=maxru:tcp_seq=-3000:pos=2:nodrop:repeats=1:strategy=1
 --lua-desync=fake:blob=maxru:tcp_ack=-66000:tcp_ts_up:tls_mod=rnd,dupsid:repeats=1:strategy=2
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:tls_mod=rnd,dupsid:repeats=1:strategy=3
@@ -193,15 +194,12 @@ NFQWS2_OPT="
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=24 --lua-desync=multisplit:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1:strategy=24
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=25 --lua-desync=multidisorder:pos=1,midsld:strategy=25
 --lua-desync=fake:blob=fake_default_tls:tcp_ts=-1000:repeats=1:strategy=26 --lua-desync=multisplit:pos=1,midsld:strategy=26
---payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tls_mod=rnd,dupsid,sni=www.google.com:tcp_ts=-1000:strategy=27 --lua-desync=multidisorder:pos=1,midsld,sniext+1,endhost-2,-10:seqovl=1:seqovl_pattern=tls_clienthello:tcp_ts_up:strategy=27 --payload=http_req --lua-desync=http_methodeol:badsum:strategy=27
-
-
---new
+ 
+  --new
 
 #Отдельные стратегии для TCP_Discord
 --filter-tcp=80,443,2053,2083,2087,2096,8443 --hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt
---payload=tls_client_hello
---lua-init=@/opt/zapret2/lua/locked.lua
+--payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello 
 --out-range=-s34228 
 --in-range=-s32768 --lua-desync=circular_locked:key=4
 --in-range=x 
@@ -233,7 +231,8 @@ NFQWS2_OPT="
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=25 --lua-desync=multidisorder:pos=1,midsld:strategy=25
 --lua-desync=fake:blob=fake_default_tls:tcp_ts=-1000:repeats=1:strategy=26 --lua-desync=multisplit:pos=1,midsld:strategy=26
 
---new
+
+  --new
 
 #Стратегии для UDP_YT
 --filter-udp=443 --hostlist=/opt/zapret2/extra_strats/UDP_YT_list.txt
@@ -266,7 +265,7 @@ NFQWS2_OPT="
 --filter-l7=discord,stun
 --in-range=-d100
 --out-range=-d100
---lua-desync=circular_locked:key=6
+--lua-desync=circular_locked:key=6:allow_nohost=1
 --payload=quic_initial,discord_ip_discovery 
 --blob=fake_quic_www_google:/opt/zapret2/files/fake/quic_initial_www_google_com.bin 
 --lua-desync=fake:blob=0x00000000000000000000000000000000:repeats=2:out_range=-d10:strategy=1
@@ -300,26 +299,34 @@ NFQWS2_OPT="
 --filter-tcp=443,5222
 --in-range=-d1000
 --out-range=-d1000
---lua-desync=circular_locked:key=7
+--lua-desync=circular_locked:key=7:allow_nohost=1
 --payload=mtproto_initial
---lua-desync=pass:strategy=1
---lua-desync=send:repeats=2:strategy=2
---lua-desync=send:repeats=3:strategy=3
---lua-desync=send:repeats=2:tcp_ack=-66000:strategy=4
---lua-desync=fake:blob=hex_zeros16:repeats=4:strategy=5
---lua-desync=fake:blob=hex_0f0f0f0f:repeats=4:strategy=6
---lua-desync=fakedsplit:pos=1:repeats=6:strategy=7
---lua-desync=multisplit:pos=1:repeats=6:strategy=8
---lua-desync=multidisorder:pos=1,3:strategy=9
---lua-desync=fakeddisorder:pos=1:strategy=10
---lua-desync=fake:blob=hex_0f0f0f0f:repeats=2:tcp_ack=-66000:strategy=11
---lua-desync=fake:blob=hex_00:ip_ttl=3:ip6_ttl=3:strategy=12
---lua-desync=fake:blob=hex_zeros16:repeats=4:badseq:strategy=13
---lua-desync=fakeddisorder:pos=1:strategy=13
---lua-desync=fakedsplit:pos=1:strategy=13
---lua-desync=fake:blob=hex_00:badseq:tls_mod=sni=max.ru:strategy=14
---lua-desync=fakeddisorder:pos=1:strategy=14
---lua-desync=fakedsplit:pos=1:strategy=14
+--lua-desync=fake:blob=hex_zeros16:repeats=6:ip_ttl=2:ip6_ttl=2:strategy=1
+--lua-desync=fake:blob=hex_0f0f0f0f:repeats=4:badsum:strategy=2
+--lua-desync=fake:blob=hex_zeros16:repeats=4:tcp_ts=1000:strategy=3
+--lua-desync=fake:blob=hex_0f0f0f0f:tcp_md5:repeats=2:strategy=4
+--lua-desync=fakedsplit:pos=1:tcp_ack=-66000:ip_ttl=2:ip6_ttl=2:strategy=5
+--lua-desync=multisplit:pos=1:tcp_flags_unset=ack:strategy=6
+--lua-desync=send:repeats=2:tcp_ack=-66000:tcp_ts_up:strategy=7
+--lua-desync=fake:blob=hex_zeros16:tcp_seq=-3000:repeats=2:strategy=8
+--lua-desync=pass:strategy=9
+--lua-desync=send:repeats=2:strategy=10
+--lua-desync=send:repeats=3:strategy=11
+--lua-desync=send:repeats=2:tcp_ack=-66000:strategy=12
+--lua-desync=fake:blob=hex_zeros16:repeats=4:strategy=13
+--lua-desync=fake:blob=hex_0f0f0f0f:repeats=4:strategy=14
+--lua-desync=fakedsplit:pos=1:repeats=6:strategy=15
+--lua-desync=multisplit:pos=1:repeats=6:strategy=16
+--lua-desync=multidisorder:pos=1,3:strategy=17
+--lua-desync=fakeddisorder:pos=1:strategy=18
+--lua-desync=fake:blob=hex_0f0f0f0f:repeats=2:tcp_ack=-66000:strategy=19
+--lua-desync=fake:blob=hex_00:ip_ttl=3:ip6_ttl=3:strategy=20
+--lua-desync=fake:blob=hex_zeros16:repeats=4:badseq:strategy=21
+--lua-desync=fakeddisorder:pos=1:strategy=21
+--lua-desync=fakedsplit:pos=1:strategy=21
+--lua-desync=fake:blob=hex_00:badseq:tls_mod=sni=max.ru:strategy=22
+--lua-desync=fakeddisorder:pos=1:strategy=22
+--lua-desync=fakedsplit:pos=1:strategy=22
 
 --new
 
@@ -327,6 +334,47 @@ NFQWS2_OPT="
 --skip --filter-udp=1026-65531
 --blob=fake_quic_unknown_udp:/opt/zapret2/files/fake/quic_initial_www_google_com.bin
 --lua-desync=fake:udp:blob=fake_quic_unknown_udp:ip_autottl=2:repeats=10
+
+--new
+
+
+  #Z2R_FALLBACK_BEGIN
+  #Безразборный блок (fallback).
+--skip --filter-tcp=443 --filter-l7=tls
+--payload=tls_client_hello
+--out-range=-s34228
+--in-range=-s32768 --lua-desync=circular_locked:key=8:allow_nohost=1
+--in-range=x
+--lua-desync=multisplit:blob=maxru:tcp_seq=-3000:pos=2:nodrop:repeats=1:strategy=1
+--lua-desync=fake:blob=maxru:tcp_ack=-66000:tcp_ts_up:tls_mod=rnd,dupsid:repeats=1:strategy=2
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:tls_mod=rnd,dupsid:repeats=1:strategy=3
+--lua-desync=multisplit:blob=maxru:tcp_ts=-1000:pos=2:nodrop:repeats=1:strategy=4
+--lua-desync=hostfakesplit:disorder_after:tcp_md5:repeats=1:strategy=5
+--lua-desync=hostfakesplit:disorder_after:nofake2:tcp_md5:repeats=1:strategy=6
+--lua-desync=hostfakesplit:tcp_ack=-66000:tcp_ts_up:repeats=1:strategy=7
+--lua-desync=hostfakesplit:nofake2:tcp_ack=-66000:tcp_ts_up:repeats=1:strategy=8
+--lua-desync=hostfakesplit:disorder_after:tcp_ack=-66000:tcp_ts_up:repeats=1:strategy=9
+--lua-desync=hostfakesplit:disorder_after:nofake2:tcp_ack=-66000:tcp_ts_up:repeats=1:strategy=10
+--lua-desync=hostfakesplit:tcp_ts=-1000:repeats=1:strategy=11
+--lua-desync=fake:blob=maxru:tcp_ack=-66000:tcp_ts_up:tls_mod=rnd,dupsid:repeats=1:strategy=12 --lua-desync=multisplit:pos=sniext+4:strategy=12
+--lua-desync=multisplit:blob=maxru:tcp_ts=-1000:pos=2:nodrop:repeats=1:strategy=13 --lua-desync=multisplit:pos=2:strategy=13
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:tls_mod=rnd,dupsid:repeats=1:strategy=14 --lua-desync=multidisorder:pos=sniext+4:strategy=14
+--lua-desync=multisplit:blob=maxru:tcp_ts=-1000:pos=2:nodrop:repeats=1:strategy=15 --lua-desync=multidisorder:pos=sniext+4:strategy=15
+--lua-desync=multisplit:blob=maxru:tcp_ts=-1000:pos=2:nodrop:repeats=1:strategy=16 --lua-desync=multidisorder:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1:strategy=16
+--lua-desync=multisplit:blob=maxru:tcp_seq=-3000:pos=2:nodrop:repeats=1:strategy=17 --lua-desync=fakedsplit:pos=midsld:tcp_seq=-3000:strategy=17
+--lua-desync=fake:blob=fake_default_tls:tcp_ts=-1000:repeats=1:strategy=18 --lua-desync=fakeddisorder:pos=sniext+1:tcp_ts=-1000:strategy=18
+--lua-desync=multisplit:blob=fake_default_tls:tcp_ts=-1000:pos=2:nodrop:repeats=1:strategy=19 --lua-desync=fakeddisorder:pos=sniext+1:tcp_ts=-1000:strategy=19
+--lua-desync=multisplit:blob=maxru:tcp_ts=-1000:pos=2:nodrop:repeats=1:strategy=20 --lua-desync=fakedsplit:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1:tcp_ts=-1000:strategy=20
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=21 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-1000:strategy=21
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:tls_mod=rnd,dupsid:repeats=1:strategy=22 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-1000:strategy=22
+--lua-desync=multisplit:blob=maxru:tcp_ts=-1000:pos=2:nodrop:repeats=1:strategy=23 --lua-desync=fakedsplit:pos=1,midsld:tcp_ts=-100:strategy=23
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=24 --lua-desync=multisplit:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1:strategy=24
+--lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=25 --lua-desync=multidisorder:pos=1,midsld:strategy=25
+--lua-desync=fake:blob=fake_default_tls:tcp_ts=-1000:repeats=1:strategy=26 --lua-desync=multisplit:pos=1,midsld:strategy=26
+  #Z2R_FALLBACK_END
+  
+
+
 "
 
 
