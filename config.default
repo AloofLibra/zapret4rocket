@@ -81,7 +81,6 @@ NFQWS2_UDP_PKT_IN=3
 # hostlist markers are replaced to empty string if MODE_FILTER does not satisfy
 # <HOSTLIST_NOAUTO> appends ipset/zapret-hosts-auto.txt as normal list
 NFQWS2_OPT="
---debug=syslog
 
 #Стратегии для YT
 --qnum 300 --filter-tcp=443 --filter-l7=tls
