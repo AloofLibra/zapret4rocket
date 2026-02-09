@@ -1,22 +1,21 @@
 local LOCKED_PATH = "/opt/zapret2/extra_strats/cache/orchestra/locked.tsv"
+local LOCKED_MANUAL_PATH = "/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
+local EXCLUDE_PATH = "/opt/zapret2/lists/exclude-domains.txt"
 local last_load = 0
 local cache_ttl = 2
 local LOCKED_TLS = {}
 local LOCKED_HTTP = {}
 local LOCKED_UDP = {}
+local EXCLUDE_ALL = {}
+local EXCLUDE_TLS = {}
+local EXCLUDE_HTTP = {}
+local EXCLUDE_UDP = {}
 
-local function load_locked_tables()
-  local now = os.time()
-  if now and (now - last_load) < cache_ttl then return end
-  last_load = now or 0
-  LOCKED_TLS = {}
-  LOCKED_HTTP = {}
-  LOCKED_UDP = {}
-
-  local f = io.open(LOCKED_PATH, "r")
+local function load_locked_file(path)
+  local f = io.open(path, "r")
   if not f then return end
   for line in f:lines() do
-    if line ~= "" then
+    if line ~= "" and not string.match(line, "^%s*#") then
       local p1, p2, p3 = string.match(line, "^([^\t]+)\t([^\t]+)\t([^\t]+)$")
       if p1 then
         local profile = string.lower(p1)
@@ -37,6 +36,45 @@ local function load_locked_tables()
     end
   end
   f:close()
+end
+
+local function load_exclude_file(path)
+  local f = io.open(path, "r")
+  if not f then return end
+  for line in f:lines() do
+    if line ~= "" and not string.match(line, "^%s*#") then
+      local p1, p2 = string.match(line, "^([^\t]+)\t([^\t]+)$")
+      if p1 and p2 then
+        local profile = string.lower(p1)
+        local proto = string.lower(p2)
+        if proto == "http" then EXCLUDE_HTTP[profile] = true
+        elseif proto == "udp" then EXCLUDE_UDP[profile] = true
+        elseif proto == "tls" then EXCLUDE_TLS[profile] = true
+        else EXCLUDE_ALL[profile] = true end
+      else
+        local p = string.match(line, "^([^\t]+)$")
+        if p then EXCLUDE_ALL[string.lower(p)] = true end
+      end
+    end
+  end
+  f:close()
+end
+
+local function load_locked_tables()
+  local now = os.time()
+  if now and (now - last_load) < cache_ttl then return end
+  last_load = now or 0
+  LOCKED_TLS = {}
+  LOCKED_HTTP = {}
+  LOCKED_UDP = {}
+  EXCLUDE_ALL = {}
+  EXCLUDE_TLS = {}
+  EXCLUDE_HTTP = {}
+  EXCLUDE_UDP = {}
+
+  load_locked_file(LOCKED_PATH)
+  load_locked_file(LOCKED_MANUAL_PATH)
+  load_exclude_file(EXCLUDE_PATH)
 end
 
 function locked_strategy_for_profile(profile, proto)
@@ -61,6 +99,14 @@ function desync_profile_key(desync)
   return "default"
 end
 
+local function profile_is_excluded(profile, proto)
+  if not profile then return false end
+  if EXCLUDE_ALL[profile] then return true end
+  if proto == "http" then return EXCLUDE_HTTP[profile] end
+  if proto == "udp" then return EXCLUDE_UDP[profile] end
+  return EXCLUDE_TLS[profile]
+end
+
 function circular_locked(ctx, desync)
   orchestrate(ctx, desync)
   if not desync.track then
@@ -70,8 +116,14 @@ function circular_locked(ctx, desync)
 
   local hrec = automate_host_record(desync)
   if not hrec then
-    DLOG("circular_locked: passing with no tampering")
-    return
+    local allow_nohost = desync.arg and desync.arg.allow_nohost
+    if allow_nohost == "1" or allow_nohost == 1 or allow_nohost == true then
+      hrec = {}
+      DLOG("circular_locked: allow_nohost enabled, using local record")
+    else
+      DLOG("circular_locked: passing with no tampering")
+      return
+    end
   end
 
   if not hrec.ctstrategy then
@@ -111,6 +163,12 @@ function circular_locked(ctx, desync)
   end
 
   local profile = desync_profile_key(desync)
+  load_locked_tables()
+  if profile_is_excluded(profile, proto) then
+    DLOG("circular_locked: excluded profile "..profile.." proto="..proto)
+    return VERDICT_PASS
+  end
+
   local locked = locked_strategy_for_profile(profile, proto)
   if locked and locked >= 1 and locked <= hrec.ctstrategy then
     hrec.nstrategy = locked
