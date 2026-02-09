@@ -282,6 +282,76 @@ toggle_hostlist_mode() {
   done
 }
 
+fallback_mode_text() {
+  local cfg="/opt/zapret2/config"
+  if [ -f "$cfg" ]; then
+    if sed -n '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/p' "$cfg" | grep -q '^[[:space:]]*--skip[[:space:]]'; then
+      echo "выключен"
+      return
+    fi
+    if sed -n '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/p' "$cfg" | grep -q '^[[:space:]]*--filter-tcp=443 --filter-l7=tls'; then
+      echo "включен"
+      return
+    fi
+  fi
+  echo "неизвестно"
+}
+
+toggle_fallback_mode() {
+  for cfg in /opt/zapret2/config /opt/zapret2/config.default; do
+    [ -f "$cfg" ] || continue
+    if sed -n '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/p' "$cfg" | grep -q '^[[:space:]]*--skip[[:space:]]'; then
+      sed -i '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/ s/^[[:space:]]*--skip[[:space:]]\+//' "$cfg"
+    else
+      sed -i '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/ s/^[[:space:]]*--filter-tcp=443 --filter-l7=tls/--skip --filter-tcp=443 --filter-l7=tls/' "$cfg"
+    fi
+  done
+}
+
+fallback_strategy_text() {
+  local file="/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
+  if [ -f "$file" ]; then
+    local val
+    val="$(awk -F '\t' '$1=="8" && $2=="tls" && $3 ~ /^[0-9]+$/ {print $3; exit}' "$file")"
+    if [ -n "$val" ]; then
+      echo "$val"
+      return
+    fi
+  fi
+  echo "не задана"
+}
+
+set_fallback_strategy() {
+  local file="/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
+  local tmp="${file}.tmp"
+  if type check_access >/dev/null 2>&1; then
+    check_access "https://5fd8bdae.nip.io/1MB.bin"
+  fi
+  read -re -p "Введите номер стратегии для безразборного блока: " strategy_num
+  mkdir -p /opt/zapret2/extra_strats/cache/orchestra
+  if [ -z "$strategy_num" ]; then
+    echo "Ввод пустой, ничего не изменено"
+  elif ! echo "$strategy_num" | grep -Eq '^[0-9]+$'; then
+    echo -e "${red}Некорректный номер стратегии.${plain}"
+  else
+    if [ -f "$file" ]; then
+      awk -F '\t' '$1!="8" || $2!="tls"' "$file" > "$tmp"
+    else
+      : > "$tmp"
+    fi
+    printf "8\ttls\t%s\n" "$strategy_num" >> "$tmp"
+    mv "$tmp" "$file"
+    echo -e "${green}Стратегия $strategy_num закреплена для безразборного блока.${plain}"
+  fi
+}
+
+fallback_profile_try() {
+  local prev_lock_file="${orch_lock_file:-/opt/zapret2/extra_strats/cache/orchestra/locked.tsv}"
+  orch_lock_file="/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
+  orch_profile_try "8" "Профиль 8: fallback (безразборный блок)" "tls" "https://5fd8bdae.nip.io/1MB.bin"
+  orch_lock_file="$prev_lock_file"
+}
+
 
 change_user() {
    if /opt/zapret2/nfq2/nfqws2 --dry-run --user="nobody" 2>&1 | grep -q "queue"; then
@@ -562,7 +632,7 @@ get_repo() {
   chmod 777 /opt/zapret2/extra_strats/cache/orchestra 2>/dev/null || true
   orchestra_update_from_repo || true
   for listfile in cloudflare-ipset.txt cloudflare-ipset_v6.txt netrogat.txt russia-discord.txt russia-youtube-rtmps.txt russia-youtube.txt russia-youtubeQ.txt tg_cidr.txt; do
-    curl -L -o /opt/zapret2/lists/$listfile https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master/lists/$listfile
+    curl -L -o /opt/zapret2/lists/$listfile https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z4r/lists/$listfile
   done
   curl -L "https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master/fake_files.tar.gz" | tar -xz -C /opt/zapret2/files/fake
   curl -L -o /opt/zapret2/extra_strats/UDP_YT_list.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/UDP/YT/List.txt
@@ -894,20 +964,22 @@ Enter (без цифр) - переустановка/обновление zapret
 0. Выход
 001. CDN тест (test.sh)
 01. Проверить доступность сервисов (Тест не точен)
-1. Фиксация стратегии профиля (оркестратор). Текущие: '"${plain}"'[ '"${strategies_status}"' ]'"${yellow}"'
+1. Фиксация стратегии профиля/безразборного блока. Текущие: '"${plain}"'[ '"${strategies_status}"' ]'"${yellow}"' (fallback: '"${plain}"'['"$(fallback_strategy_text)"']'"${yellow}"')
 2. Стоп/пере(запуск) zapret2 (сейчас: '"$(pidof nfqws2 >/dev/null && echo "${green}Запущен${yellow}" || echo "${red}Остановлен${yellow}")"' | оркестратор: '"${plain}"'['"$(orchestra_status_text)"']'"${yellow}"')
 3. Запуск blockcheck2 и сохранение SUMMARY
 4. Удалить zapret2
 5. Обновить стратегии, сбросить листы подбора стратегий и исключений (есть бэкап)
-6. Исключить домен из zapret2 обработки
-7. Открыть в редакторе config (Установит nano редактор ~250kb)
-8. Преключатель скриптов bol-van обхода войсов DS,WA,TG на стандартные страты или возврат к скриптам. Сейчас: '"${plain}"'['"$(grep -Eq '^NFQWS_PORTS_UDP=.*443$' /opt/zapret2/config && echo "Скрипты" || (grep -Eq '443,1400,3478-3481,5349,50000-50099,19294-19344$' /opt/zapret2/config && echo "Классические стратегии" || echo "Незвестно"))"']'"${yellow}"'
-9. Переключатель zapret2 на nftables/iptables (На всё жать Enter). Актуально для OpenWRT 21+. Может помочь с войсами. Сейчас: '"${plain}"'['"$(grep -q '^FWTYPE=iptables$' /opt/zapret2/config && echo "iptables" || (grep -q '^FWTYPE=nftables$' /opt/zapret2/config && echo "nftables" || echo "Неизвестно"))"']'"${yellow}"'
-10. (Де)активировать обход UDP на 1026-65531 портах (BF6, Fifa и т.п.). Сейчас: '"${plain}"'['"$(grep -q '^NFQWS_PORTS_UDP=443' /opt/zapret2/config && echo "Выключен" || (grep -q '^NFQWS_PORTS_UDP=1026-65531,443' /opt/zapret2/config && echo "Включен" || echo "Неизвестно"))"']'"${yellow}"'
-11. Управление аппаратным ускорением zapret2. Может увеличить скорость на роутере. Сейчас: '"${plain}"'['"$(grep '^FLOWOFFLOAD=' /opt/zapret2/config)"']'"${yellow}"'
-12. Режим фильтра hostlist/autohostlist. Сейчас: '"${plain}"'['"$(hostlist_mode_text)"']'"${yellow}"'
-13. Активировать доступ в меню через браузер (~3мб места)
-14. Провайдер
+6. Добавить домен в исключения
+7. Добавить домен в обработку (RKN список)
+8. Открыть в редакторе config (Установит nano редактор ~250kb)
+9. Преключатель скриптов bol-van обхода войсов DS,WA,TG на стандартные страты или возврат к скриптам. Сейчас: '"${plain}"'['"$(grep -Eq '^NFQWS_PORTS_UDP=.*443$' /opt/zapret2/config && echo "Скрипты" || (grep -Eq '443,1400,3478-3481,5349,50000-50099,19294-19344$' /opt/zapret2/config && echo "Классические стратегии" || echo "Незвестно"))"']'"${yellow}"'
+10. Переключатель zapret2 на nftables/iptables (На всё жать Enter). Актуально для OpenWRT 21+. Может помочь с войсами. Сейчас: '"${plain}"'['"$(grep -q '^FWTYPE=iptables$' /opt/zapret2/config && echo "iptables" || (grep -q '^FWTYPE=nftables$' /opt/zapret2/config && echo "nftables" || echo "Неизвестно"))"']'"${yellow}"'
+11. (Де)активировать обход UDP на 1026-65531 портах (BF6, Fifa и т.п.). Сейчас: '"${plain}"'['"$(grep -q '^NFQWS_PORTS_UDP=443' /opt/zapret2/config && echo "Выключен" || (grep -q '^NFQWS_PORTS_UDP=1026-65531,443' /opt/zapret2/config && echo "Включен" || echo "Неизвестно"))"']'"${yellow}"'
+12. Управление аппаратным ускорением zapret2. Может увеличить скорость на роутере. Сейчас: '"${plain}"'['"$(grep '^FLOWOFFLOAD=' /opt/zapret2/config)"']'"${yellow}"'
+  13. Режим фильтра hostlist/autohostlist. Сейчас: '"${plain}"'['"$(hostlist_mode_text)"']'"${yellow}"'
+14. Безразборный режим (fallback). Сейчас: '"${plain}"'['"$(fallback_mode_text)"']'"${yellow}"'
+15. Активировать доступ в меню через браузер (~3мб места)
+16. Провайдер
 777. Активировать zeefeer premium (Нажимать только Valery ProD, avg97, Xoz, GeGunT, blagodarenya, mikhyan, Xoz, andric62, Whoze, Necronicle, Andrei_5288515371, Nomand, Dina_turat, Nergalss, Александру, АлександруП, vecheromholodno, ЕвгениюГ, Dyadyabo, skuwakin, izzzgoy, Grigaraz, Reconnaissance, comandante1928, umad, rudnev2028, rutakote, railwayfx, vtokarev1604, Grigaraz, a40letbezurojaya и subzeero452 и остальным поддержавшим проект. Но если очень хочется - можно нажать и другим)\033[0m'
     if [[ -f "$PREMIUM_FLAG" ]]; then
       echo -e "${red}999. Секретный пункт. Нажимать на свой страх и риск${plain}"
@@ -943,7 +1015,19 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "1")
-    strategies_submenu
+    echo -e "${yellow}1 - Фиксация профиля (оркестратор)${plain}"
+    echo -e "${yellow}2 - Стратегия безразборного блока (fallback)${plain}"
+    read -re -p "Выберите пункт (Enter - отмена): " sub_action
+    case "$sub_action" in
+      "1")
+        strategies_submenu
+        ;;
+      "2")
+        fallback_profile_try
+        ;;
+      *)
+        ;;
+    esac
     ;;
 
   "2")
@@ -987,8 +1071,12 @@ Enter (без цифр) - переустановка/обновление zapret
   "6")
     read -re -p "Введите домен, который добавить в исключения (например, mydomain.com): " user_domain
     if [ -n "$user_domain" ]; then
-      echo "$user_domain" >> /opt/zapret2/lists/netrogat.txt
-      echo -e "Домен ${yellow}$user_domain${plain} добавлен в исключения (netrogat.txt)."
+      exclude_file="/opt/zapret2/lists/exclude-domains.txt"
+      mkdir -p /opt/zapret2/lists
+      if ! grep -Fxq "$user_domain" "$exclude_file" 2>/dev/null; then
+        echo "$user_domain" >> "$exclude_file"
+      fi
+      echo -e "Домен ${yellow}$user_domain${plain} добавлен в исключения (exclude-domains.txt)."
     else
       echo "Ввод пустой, ничего не добавлено"
     fi
@@ -996,6 +1084,45 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "7")
+    read -re -p "Введите домен, который добавить в обработку (например, mydomain.com): " user_domain
+    if [ -n "$user_domain" ]; then
+      if type check_access >/dev/null 2>&1; then
+        check_access "$user_domain"
+      fi
+      read -re -p "Введите номер стратегии для домена (обязательно): " strategy_num
+      if [ -z "$strategy_num" ]; then
+        echo "Ввод пустой, добавление отменено"
+        pause_enter
+        continue
+      fi
+      if ! echo "$strategy_num" | grep -Eq '^[0-9]+$'; then
+        echo -e "${red}Некорректный номер стратегии.${plain}"
+        pause_enter
+        continue
+      fi
+      rkn_file="/opt/zapret2/extra_strats/TCP_RKN_list.txt"
+      mkdir -p /opt/zapret2/extra_strats
+      if ! grep -Fxq "$user_domain" "$rkn_file" 2>/dev/null; then
+        echo "$user_domain" >> "$rkn_file"
+      fi
+      lock_file="/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
+      lock_tmp="${lock_file}.tmp"
+      mkdir -p /opt/zapret2/extra_strats/cache/orchestra
+      if [ -f "$lock_file" ]; then
+        awk -F '	' -v d="$user_domain" '$1!=d || $2!="tls"' "$lock_file" > "$lock_tmp"
+      else
+        : > "$lock_tmp"
+      fi
+      printf "%s\ttls\t%s\n" "$user_domain" "$strategy_num" >> "$lock_tmp"
+      mv "$lock_tmp" "$lock_file"
+      echo -e "Домен ${yellow}$user_domain${plain} добавлен в обработку (TCP_RKN_list.txt), стратегия $strategy_num закреплена."
+    else
+      echo "Ввод пустой, ничего не добавлено"
+    fi
+    pause_enter
+    ;;
+
+  "8")
     if [[ "$OSystem" == "VPS" ]]; then
       apt install nano
     else
@@ -1006,29 +1133,29 @@ Enter (без цифр) - переустановка/обновление zapret
     # после выхода из nano
     ;;
 
-  "8")
+  "9")
     echo -e "${yellow}Временно не работает${plain}"
     # menu_action_toggle_bolvan_ports
     pause_enter
     ;;
 
-  "9")
+  "10")
     menu_action_toggle_fwtype
     pause_enter
     ;;
 
-  "10")
+  "11")
     echo -e "${yellow}Временно не работает${plain}"
     # pause_entermenu_action_toggle_udp_range
     
     pause_enter
     ;;
 
-  "11")
+  "12")
     flowoffload_submenu   # сабменю само в цикле и выходит через return
     ;;
 
-  "12")
+  "13")
     toggle_hostlist_mode
     if pidof nfqws2 >/dev/null; then
       "$ZAPRET2_INIT" restart
@@ -1038,12 +1165,22 @@ Enter (без цифр) - переустановка/обновление zapret
     pause_enter
     ;;
 
-  "13")
+  "14")
+    toggle_fallback_mode
+    if pidof nfqws2 >/dev/null; then
+      "$ZAPRET2_INIT" restart
+      orchestra_start
+      echo -e "${green}zapret2 перезапущен для применения режима${plain}"
+    fi
+    pause_enter
+    ;;
+
+  "15")
     ttyd_webssh
     pause_enter
     ;;
 
-  "14")
+  "16")
     provider_submenu      # сабменю само в цикле и выходит через return
     ;;
 
