@@ -445,9 +445,9 @@ get_repo() {
   chmod 777 /opt/zapret2/extra_strats/cache/orchestra 2>/dev/null || true
   orchestra_update_from_repo || true
   for listfile in cloudflare-ipset.txt cloudflare-ipset_v6.txt netrogat.txt russia-discord.txt russia-youtube-rtmps.txt russia-youtube.txt russia-youtubeQ.txt tg_cidr.txt; do
-    curl -L -o /opt/zapret2/lists/$listfile https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z4r/lists/$listfile
+    curl -L -o /opt/zapret2/lists/$listfile https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master/lists/$listfile
   done
-  curl -L "https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z4r/fake_files.tar.gz" | tar -xz -C /opt/zapret2/files/fake
+  curl -L "https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master/fake_files.tar.gz" | tar -xz -C /opt/zapret2/files/fake
   curl -L -o /opt/zapret2/extra_strats/UDP_YT_list.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/UDP/YT/List.txt
   curl -L -o /opt/zapret2/extra_strats/TCP_RKN_list.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/TCP/RKN/List.txt
   curl -L -o /opt/zapret2/extra_strats/TCP_YT_list.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/TCP/YT/List.txt
