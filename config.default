@@ -161,8 +161,8 @@ NFQWS2_OPT="
 --new
 
 #Стратегии для RKN
---filter-tcp=80,443,2053,2083,2087,2096,8443 --filter-l7=tls 
---hostlist=/opt/zapret2/extra_strats/TCP_RKN_list.txt 
+--filter-tcp=80,443,2053,2083,2087,2096,8443 --filter-l7=http,tls 
+--hostlist=/opt/zapret2/extra_strats/TCP_RKN_list.txt
 --lua-init=@/opt/zapret2/lua/locked.lua
 --out-range=-s34228 
 --in-range=-s32768 --lua-desync=circular_locked:key=3
@@ -194,6 +194,8 @@ NFQWS2_OPT="
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=24 --lua-desync=multisplit:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1:strategy=24
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:repeats=1:strategy=25 --lua-desync=multidisorder:pos=1,midsld:strategy=25
 --lua-desync=fake:blob=fake_default_tls:tcp_ts=-1000:repeats=1:strategy=26 --lua-desync=multisplit:pos=1,midsld:strategy=26
+--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tls_mod=rnd,dupsid,sni=www.google.com:tcp_ts=-1000:strategy=27 --lua-desync=multidisorder:pos=1,midsld,sniext+1,endhost-2,-10:seqovl=1:seqovl_pattern=tls_clienthello:tcp_ts_up:strategy=27 --payload=http_req --lua-desync=http_methodeol:badsum":strategy=27
+
 
 --new
 
