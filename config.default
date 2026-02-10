@@ -161,14 +161,14 @@ NFQWS2_OPT="
 --new
 
   #Стратегии для RKN
-  --filter-tcp=80,443,2053,2083,2087,2096,8443 --filter-l7=tls
-  --hostlist=/opt/zapret2/extra_strats/TCP_RKN_list.txt
+--filter-tcp=80,443,2053,2083,2087,2096,8443 --filter-l7=tls
+--hostlist=/opt/zapret2/extra_strats/TCP_RKN_list.txt
 --hostlist-exclude=/opt/zapret2/extra_strats/TCP_Discord.txt
-  --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello
-  --out-range=-s34228
-  --in-range=-s32768 --lua-desync=circular_locked:key=3
-  --in-range=x
-  --payload=tls_client_hello,http_req
+--payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello
+--out-range=-s34228
+--in-range=-s32768 --lua-desync=circular_locked:key=3
+--in-range=x
+--payload=tls_client_hello,http_req
 --lua-desync=multisplit:blob=maxru:tcp_seq=-3000:pos=2:nodrop:repeats=1:strategy=1
 --lua-desync=fake:blob=maxru:tcp_ack=-66000:tcp_ts_up:tls_mod=rnd,dupsid:repeats=1:strategy=2
 --lua-desync=fake:blob=maxru:tcp_ts=-1000:tls_mod=rnd,dupsid:repeats=1:strategy=3
