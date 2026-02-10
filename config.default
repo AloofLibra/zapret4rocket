@@ -341,6 +341,7 @@ NFQWS2_OPT="
   #Z2R_FALLBACK_BEGIN
   #Безразборный блок (fallback).
 --skip --filter-tcp=443 --filter-l7=tls
+--hostlist-exclude=/opt/zapret2/lists/exclude-domains.txt
 --payload=tls_client_hello
 --out-range=-s34228
 --in-range=-s32768 --lua-desync=circular_locked:key=8:allow_nohost=1
