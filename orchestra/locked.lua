@@ -1,15 +1,10 @@
 local LOCKED_PATH = "/opt/zapret2/extra_strats/cache/orchestra/locked.tsv"
 local LOCKED_MANUAL_PATH = "/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
-local EXCLUDE_PATH = "/opt/zapret2/lists/exclude-domains.txt"
 local last_load = 0
 local cache_ttl = 2
 local LOCKED_TLS = {}
 local LOCKED_HTTP = {}
 local LOCKED_UDP = {}
-local EXCLUDE_ALL = {}
-local EXCLUDE_TLS = {}
-local EXCLUDE_HTTP = {}
-local EXCLUDE_UDP = {}
 
 local function load_locked_file(path)
   local f = io.open(path, "r")
@@ -38,28 +33,6 @@ local function load_locked_file(path)
   f:close()
 end
 
-local function load_exclude_file(path)
-  local f = io.open(path, "r")
-  if not f then return end
-  for line in f:lines() do
-    if line ~= "" and not string.match(line, "^%s*#") then
-      local p1, p2 = string.match(line, "^([^\t]+)\t([^\t]+)$")
-      if p1 and p2 then
-        local profile = string.lower(p1)
-        local proto = string.lower(p2)
-        if proto == "http" then EXCLUDE_HTTP[profile] = true
-        elseif proto == "udp" then EXCLUDE_UDP[profile] = true
-        elseif proto == "tls" then EXCLUDE_TLS[profile] = true
-        else EXCLUDE_ALL[profile] = true end
-      else
-        local p = string.match(line, "^([^\t]+)$")
-        if p then EXCLUDE_ALL[string.lower(p)] = true end
-      end
-    end
-  end
-  f:close()
-end
-
 local function load_locked_tables()
   local now = os.time()
   if now and (now - last_load) < cache_ttl then return end
@@ -67,14 +40,9 @@ local function load_locked_tables()
   LOCKED_TLS = {}
   LOCKED_HTTP = {}
   LOCKED_UDP = {}
-  EXCLUDE_ALL = {}
-  EXCLUDE_TLS = {}
-  EXCLUDE_HTTP = {}
-  EXCLUDE_UDP = {}
 
   load_locked_file(LOCKED_PATH)
   load_locked_file(LOCKED_MANUAL_PATH)
-  load_exclude_file(EXCLUDE_PATH)
 end
 
 function locked_strategy_for_profile(profile, proto)
@@ -99,12 +67,23 @@ function desync_profile_key(desync)
   return "default"
 end
 
-local function profile_is_excluded(profile, proto)
-  if not profile then return false end
-  if EXCLUDE_ALL[profile] then return true end
-  if proto == "http" then return EXCLUDE_HTTP[profile] end
-  if proto == "udp" then return EXCLUDE_UDP[profile] end
-  return EXCLUDE_TLS[profile]
+local function desync_hostname(desync)
+  if desync.hostname then return tostring(desync.hostname) end
+  if desync.host then return tostring(desync.host) end
+  if desync.http_host then return tostring(desync.http_host) end
+  if desync.sni then return tostring(desync.sni) end
+  if desync.tls_sni then return tostring(desync.tls_sni) end
+  if desync.server_name then return tostring(desync.server_name) end
+  if desync.tls and desync.tls.sni then return tostring(desync.tls.sni) end
+  if desync.tls and desync.tls.server_name then return tostring(desync.tls.server_name) end
+  if desync.http and desync.http.host then return tostring(desync.http.host) end
+  if desync.arg and desync.arg.host then return tostring(desync.arg.host) end
+  if desync.arg and desync.arg.hostname then return tostring(desync.arg.hostname) end
+  if desync.arg and desync.arg.sni then return tostring(desync.arg.sni) end
+  if desync.arg and desync.arg.tls_sni then return tostring(desync.arg.tls_sni) end
+  if desync.arg and desync.arg.server_name then return tostring(desync.arg.server_name) end
+  if desync.arg and desync.arg.http_host then return tostring(desync.arg.http_host) end
+  return nil
 end
 
 function circular_locked(ctx, desync)
@@ -114,10 +93,12 @@ function circular_locked(ctx, desync)
     return
   end
 
+  local allow_nohost_enabled = false
   local hrec = automate_host_record(desync)
   if not hrec then
     local allow_nohost = desync.arg and desync.arg.allow_nohost
     if allow_nohost == "1" or allow_nohost == 1 or allow_nohost == true then
+      allow_nohost_enabled = true
       hrec = {}
       DLOG("circular_locked: allow_nohost enabled, using local record")
     else
@@ -163,10 +144,16 @@ function circular_locked(ctx, desync)
   end
 
   local profile = desync_profile_key(desync)
-  load_locked_tables()
-  if profile_is_excluded(profile, proto) then
-    DLOG("circular_locked: excluded profile "..profile.." proto="..proto)
-    return VERDICT_PASS
+  if allow_nohost_enabled then
+    local host = desync_hostname(desync)
+    if host and host ~= "" then
+      host = host:gsub("%.$", "")
+      host = string.lower(host)
+      if host ~= "" then
+        profile = host
+        DLOG("circular_locked: allow_nohost profile from host "..profile)
+      end
+    end
   end
 
   local locked = locked_strategy_for_profile(profile, proto)
