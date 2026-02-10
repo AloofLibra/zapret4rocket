@@ -302,32 +302,7 @@ NFQWS2_OPT="
 --out-range=-d1000
 --lua-desync=circular_locked:key=7:allow_nohost=1
 --payload=mtproto_initial
---lua-desync=fake:blob=hex_0f0f0f0f:repeats=6:ip_ttl=2:ip6_ttl=2:strategy=1
---lua-desync=fake:blob=hex_0f0f0f0f:repeats=4:badsum:strategy=2
---lua-desync=fake:blob=hex_0f0f0f0f:repeats=4:tcp_ts=1000:strategy=3
---lua-desync=fake:blob=hex_0f0f0f0f:tcp_md5:repeats=2:strategy=4
---lua-desync=fakedsplit:pos=1:tcp_ack=-66000:ip_ttl=2:ip6_ttl=2:strategy=5
---lua-desync=multisplit:pos=1:tcp_flags_unset=ack:strategy=6
---lua-desync=send:repeats=2:tcp_ack=-66000:tcp_ts_up:strategy=7
---lua-desync=fake:blob=hex_0f0f0f0f:tcp_seq=-3000:repeats=2:strategy=8
---lua-desync=pass:strategy=9
---lua-desync=send:repeats=2:strategy=10
---lua-desync=send:repeats=3:strategy=11
---lua-desync=send:repeats=2:tcp_ack=-66000:strategy=12
---lua-desync=fake:blob=hex_0f0f0f0f:repeats=4:strategy=13
---lua-desync=fake:blob=hex_0f0f0f0f:repeats=4:strategy=14
---lua-desync=fakedsplit:pos=1:repeats=6:strategy=15
---lua-desync=multisplit:pos=1:repeats=6:strategy=16
---lua-desync=multidisorder:pos=1,3:strategy=17
---lua-desync=fakeddisorder:pos=1:strategy=18
---lua-desync=fake:blob=hex_0f0f0f0f:repeats=2:tcp_ack=-66000:strategy=19
---lua-desync=fake:blob=hex_00:ip_ttl=3:ip6_ttl=3:strategy=20
---lua-desync=fake:blob=hex_0f0f0f0f:repeats=4:badseq:strategy=21
---lua-desync=fakeddisorder:pos=1:strategy=21
---lua-desync=fakedsplit:pos=1:strategy=21
---lua-desync=fake:blob=hex_00:badseq:tls_mod=sni=max.ru:strategy=22
---lua-desync=fakeddisorder:pos=1:strategy=22
---lua-desync=fakedsplit:pos=1:strategy=22
+--lua-desync=fakedsplit:pos=1:strategy=1
 
 --new
 
