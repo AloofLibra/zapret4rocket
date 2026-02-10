@@ -167,6 +167,7 @@ orch_profile_try() {
         if [ -x "$ORCH_SCRIPT" ]; then
             "$ORCH_SCRIPT" sync
         fi
+        echo "Стратегия $s применена."
         if [ -n "$test_url" ]; then
             echo "Проверка доступа: $test_url"
             check_access "$test_url"
