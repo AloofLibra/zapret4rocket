@@ -684,6 +684,21 @@ remove_zapret() {
  else
      echo "Папка zapret2 не существует."
  fi
+ if [[ "$OSystem" == "entware" ]]; then
+ 	rm -fv /opt/etc/init.d/S90-zapret /opt/etc/ndm/netfilter.d/000-zapret.sh /opt/etc/init.d/S00fix
+ fi
+ read -re -p $'\033[33mУдалить функционал доступа в меню через браузер (web-ssh)? Enter - Да, 1 - нет\033[0m\n' ttyd_answer_del
+ case "$ttyd_answer_del" in
+     "1")
+         echo "Пропущено"
+     ;;
+     *)
+ 		apk del ttyd 2>/dev/null || true
+ 		opkg remove ttyd 2>/dev/null || true
+ 		rm -f /usr/bin/ttyd
+ 		echo "Процесс удаления завершён"
+     ;;
+  esac
 }
 
 #Запрос желаемой версии zapret2
