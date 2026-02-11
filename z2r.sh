@@ -210,8 +210,12 @@ orchestra_update_from_repo() {
 
 # Проверяем оркестратор и locked.lua, при отсутствии пробуем скачать из репозитория
 if [ ! -s "$ORCH_SCRIPT" ] || [ ! -s "$ORCH_LUA_LOCKED" ]; then
-  echo "Не найдены orchestrator.sh или locked.lua. Пытаюсь скачать из репозитория..."
-  orchestra_update_from_repo || true
+  if [ -d /opt/zapret2 ] && [ -w /opt/zapret2 ]; then
+    echo "Не найдены orchestrator.sh или locked.lua. Пытаюсь скачать из репозитория..."
+    orchestra_update_from_repo || true
+  else
+    echo "Не найдены orchestrator.sh или locked.lua. Пропуск загрузки: /opt/zapret2 недоступен для записи."
+  fi
 fi
 
 orchestra_start() {
@@ -1311,6 +1315,14 @@ zapret_get
 
 #Создаём папки и забираем файлы папок lists, fake, extra_strats, копируем конфиг, скрипты для войсов DS, WA, TG
 get_repo
+if [ ! -s "$ORCH_SCRIPT" ] || [ ! -s "$ORCH_LUA_LOCKED" ]; then
+  echo "Повторная попытка загрузки orchestrator.sh и locked.lua..."
+  if orchestra_update_from_repo; then
+    echo -e "${green}Повторная загрузка orchestrator.sh и locked.lua успешна.${plain}"
+  else
+    echo -e "${red}Повторная загрузка orchestrator.sh и locked.lua не удалась.${plain}"
+  fi
+fi
 
 #Для Keenetic и merlin
 if [[ "$OSystem" == "entware" ]]; then
