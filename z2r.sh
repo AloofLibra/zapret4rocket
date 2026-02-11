@@ -209,12 +209,10 @@ orchestra_update_from_repo() {
 }
 
 # Проверяем оркестратор и locked.lua, при отсутствии пробуем скачать из репозитория
-if [ ! -s "$ORCH_SCRIPT" ] || [ ! -s "$ORCH_LUA_LOCKED" ]; then
-  if [ -d /opt/zapret2 ] && [ -w /opt/zapret2 ]; then
+if [ -f /opt/zapret2/config ]; then
+  if [ ! -s "$ORCH_SCRIPT" ] || [ ! -s "$ORCH_LUA_LOCKED" ]; then
     echo "Не найдены orchestrator.sh или locked.lua. Пытаюсь скачать из репозитория..."
     orchestra_update_from_repo || true
-  else
-    echo "Не найдены orchestrator.sh или locked.lua. Пропуск загрузки: /opt/zapret2 недоступен для записи."
   fi
 fi
 
