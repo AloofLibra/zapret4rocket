@@ -5,7 +5,12 @@ pause_enter() {
 }
 
 submenu_item() {
-  echo -e "${green}$1. $2${plain} $3"
+  local key="$1"
+  if [ "$key" = "0" ]; then
+    echo -e "${Fyellow}${key}.${plain} ${Fyellow}$2${plain} $3"
+  else
+    echo -e "${Fcyan}${key}.${plain} ${green}$2${plain} $3"
+  fi
 }
 
 # Совместимость со старым кодом меню
