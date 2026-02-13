@@ -28,6 +28,7 @@ strategies_submenu() {
     submenu_item "	5" "Профиль 5: UDP 443 (YouTube QUIC) [${p5_max:-0}]" "udp"
     submenu_item "	6" "Профиль 6: UDP Voice (Discord/STUN) [${p6_max:-0}]" "udp"
     submenu_item "	7" "Профиль 7: MTProto/Telegram [${p7_max:-0}]" "tls"
+    submenu_item "	8" "Добавить домен в RKN список (с/без подбора стратегии)"
     submenu_item "	0" "Назад"
     echo ""
 
@@ -56,6 +57,9 @@ strategies_submenu() {
         ;;
       "7")
         orch_profile_try "7" "Профиль 7: MTProto/Telegram" "tls" "https://telegram.org/"
+        ;;
+      "8")
+        manage_custom_rkn_domain
         ;;
       "0"|"")
         return

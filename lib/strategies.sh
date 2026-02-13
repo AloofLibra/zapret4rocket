@@ -168,7 +168,14 @@ orch_profile_try() {
             "$ORCH_SCRIPT" sync
         fi
         echo "Стратегия $s применена."
-        if [ -n "$test_url" ]; then
+        if [ "$test_url" = "__RUN_CDN_TEST__" ]; then
+            echo "Проверка доступа: CDN test (как в пункте 001)"
+            if type run_cdn_test >/dev/null 2>&1; then
+                run_cdn_test
+            else
+                echo "run_cdn_test недоступен, пропускаем проверку."
+            fi
+        elif [ -n "$test_url" ]; then
             echo "Проверка доступа: $test_url"
             check_access "$test_url"
         fi
@@ -209,6 +216,114 @@ get_orchestra_locks_info() {
     p7_tls="$(orch_locked_get 7 tls)"
     printf "P1(tls=%s,http=%s) P2(tls=%s) P3(tls=%s) P4(tls=%s) P5(udp=%s) P6(udp=%s) P7(tls=%s)" \
         "${p1_tls:-0}" "${p1_http:-0}" "${p2_tls:-0}" "${p3_tls:-0}" "${p4_tls:-0}" "${p5_udp:-0}" "${p6_udp:-0}" "${p7_tls:-0}"
+}
+
+manage_custom_rkn_domain() {
+    local user_domain="" test_url="" rkn_file="" mode="" strategy_num=""
+    local max_strat="" current_strat="" prev_strat="" answer=""
+    local only_add=0
+
+    read -re -p "Введите домен для добавления в RKN-обработку (например, example.com): " user_domain
+    if [ -z "$user_domain" ]; then
+        echo "Ввод пустой, ничего не добавлено."
+        pause_enter
+        return 0
+    fi
+
+    echo "1 - только добавить домен в список RKN"
+    echo "2 - добавить и подобрать стратегию для этого домена"
+    echo "0 - отмена"
+    read -re -p "Ваш выбор: " mode
+
+    case "$mode" in
+        "1")
+            only_add=1
+            ;;
+        "2")
+            ;;
+        "0"|"")
+            echo "Отменено."
+            pause_enter
+            return 0
+            ;;
+        *)
+            echo "Отменено."
+            pause_enter
+            return 0
+            ;;
+    esac
+
+    rkn_file="/opt/zapret2/extra_strats/TCP_RKN_list.txt"
+    mkdir -p /opt/zapret2/extra_strats
+    if ! grep -Fxq "$user_domain" "$rkn_file" 2>/dev/null; then
+        echo "$user_domain" >> "$rkn_file"
+        echo -e "${green}Домен $user_domain добавлен в $rkn_file${plain}"
+    else
+        echo -e "${yellow}Домен $user_domain уже есть в $rkn_file${plain}"
+    fi
+
+    if [ "$only_add" -eq 1 ]; then
+        pause_enter
+        return 0
+    fi
+
+    max_strat="$(orch_max_strategy_for_profile 3)"
+    if [ -z "$max_strat" ] || [ "$max_strat" -le 0 ]; then
+        max_strat=19
+    fi
+
+    current_strat="$(orch_locked_get "$user_domain" "tls")"
+    if ! printf "%s" "$current_strat" | grep -Eq '^[0-9]+$' || [ "$current_strat" -le 0 ]; then
+        current_strat=1
+    fi
+    prev_strat="$(orch_locked_get "$user_domain" "tls")"
+
+    read -re -p "Введите номер стратегии для старта (Enter - текущая $current_strat): " strategy_num
+    if [ -z "$strategy_num" ]; then
+        strategy_num="$current_strat"
+    fi
+    if ! printf "%s" "$strategy_num" | grep -Eq '^[0-9]+$'; then
+        echo "Некорректный номер стратегии. Начинаем с 1."
+        strategy_num=1
+    elif [ "$strategy_num" -lt 1 ] || [ "$strategy_num" -gt "$max_strat" ]; then
+        echo "Номер вне диапазона. Начинаем с 1."
+        strategy_num=1
+    fi
+
+    test_url="$user_domain"
+    if ! printf "%s" "$test_url" | grep -Eq '^https?://'; then
+        test_url="https://$test_url"
+    fi
+
+    for ((s=strategy_num; s<=max_strat; s++)); do
+        orch_locked_set "$user_domain" "tls" "$s"
+        if [ -x "$ORCH_SCRIPT" ]; then
+            "$ORCH_SCRIPT" sync
+        fi
+
+        echo "Стратегия $s применена для домена $user_domain"
+        check_access "$test_url"
+
+        read -re -p "1 - сохранить, 0 - отмена, Enter - далее: " answer
+        if [ "$answer" = "1" ]; then
+            echo "Стратегия $s сохранена для $user_domain."
+            pause_enter
+            return 0
+        elif [ "$answer" = "0" ]; then
+            break
+        fi
+    done
+
+    if printf "%s" "$prev_strat" | grep -Eq '^[0-9]+$' && [ "$prev_strat" -gt 0 ]; then
+        orch_locked_set "$user_domain" "tls" "$prev_strat"
+    else
+        orch_locked_clear "$user_domain" "tls"
+    fi
+    if [ -x "$ORCH_SCRIPT" ]; then
+        "$ORCH_SCRIPT" sync
+    fi
+    echo "Изменения по стратегии для домена отменены."
+    pause_enter
 }
 
 #Функция для функции подбора стратегий
