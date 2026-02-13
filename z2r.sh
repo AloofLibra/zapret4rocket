@@ -357,6 +357,8 @@ fallback_profile_try() {
 tls_blob_menu_text() {
   local cfg="/opt/zapret2/config"
   local blob_file=""
+  local has_tls_maxru=0
+  local has_tls_default=0
   if [ ! -f "$cfg" ]; then
     cfg="/opt/zapret2/config.default"
   fi
@@ -365,8 +367,29 @@ tls_blob_menu_text() {
     return
   fi
 
-  if grep -q -- "--lua-desync=fake:blob=fake_default_tls" "$cfg"; then
+  if awk '
+      /--filter-l7=tls/ || index($0, "--hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt") {in_tls=1}
+      in_tls && /^[[:space:]]*--new[[:space:]]*$/ {in_tls=0}
+      in_tls && /--lua-desync=/ && /blob=maxru/ && $0 !~ /strategy=26/ {found=1}
+      END {exit(found?0:1)}
+    ' "$cfg"; then
+    has_tls_maxru=1
+  fi
+  if awk '
+      /--filter-l7=tls/ || index($0, "--hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt") {in_tls=1}
+      in_tls && /^[[:space:]]*--new[[:space:]]*$/ {in_tls=0}
+      in_tls && /--lua-desync=/ && /blob=fake_default_tls/ && $0 !~ /strategy=26/ {found=1}
+      END {exit(found?0:1)}
+    ' "$cfg"; then
+    has_tls_default=1
+  fi
+
+  if [ "$has_tls_default" -eq 1 ] && [ "$has_tls_maxru" -eq 0 ]; then
     echo "default"
+    return
+  fi
+  if [ "$has_tls_default" -eq 1 ] && [ "$has_tls_maxru" -eq 1 ]; then
+    echo "mixed"
     return
   fi
 
