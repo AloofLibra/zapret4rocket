@@ -204,9 +204,9 @@ menu_action_set_tls_blob() {
 
   current_blob="$(sed -n -E 's#.*--blob=maxru:@/opt/zapret2/files/fake/([^[:space:]]+).*#\1#p' "$cfg" | head -n1)"
   [ -z "$current_blob" ] && current_blob="не найден в конфиге"
-  if grep -q -- "--lua-desync=fake:blob=fake_default_tls" "$cfg"; then
+  if grep -q -- "blob=fake_default_tls" "$cfg"; then
     current_mode="fake_default_tls (встроенный)"
-  elif grep -q -- "--lua-desync=fake:blob=maxru" "$cfg"; then
+  elif grep -q -- "blob=maxru" "$cfg"; then
     current_mode="maxru (внешний файл)"
   else
     current_mode="не определён"
@@ -242,9 +242,9 @@ menu_action_set_tls_blob() {
 
   if [ "$choice" -eq 1 ]; then
     if [ "$sed_ereg" = "-E" ]; then
-      sed -i -E '/--filter-l7=tls/,/^[[:space:]]*--new[[:space:]]*$/ s#(--lua-desync=[^[:space:]]*fake:blob=)maxru#\1fake_default_tls#g' "$cfg"
+      sed -i -E '/--filter-l7=tls/,/^[[:space:]]*--new[[:space:]]*$/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)maxru#\1fake_default_tls#g; }' "$cfg"
     else
-      sed -i -r '/--filter-l7=tls/,/^[[:space:]]*--new[[:space:]]*$/ s#(--lua-desync=[^[:space:]]*fake:blob=)maxru#\1fake_default_tls#g' "$cfg"
+      sed -i -r '/--filter-l7=tls/,/^[[:space:]]*--new[[:space:]]*$/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)maxru#\1fake_default_tls#g; }' "$cfg"
     fi
     echo -e "${green}В TLS-стратегиях выбран встроенный blob: fake_default_tls${plain}"
     echo -e "${yellow}Строка --blob=maxru:@... сохранена без изменений для обратного переключения.${plain}"
@@ -261,10 +261,10 @@ menu_action_set_tls_blob() {
   fi
 
   if [ "$sed_ereg" = "-E" ]; then
-    sed -i -E '/--filter-l7=tls/,/^[[:space:]]*--new[[:space:]]*$/ s#(--lua-desync=[^[:space:]]*fake:blob=)fake_default_tls#\1maxru#g' "$cfg"
+    sed -i -E '/--filter-l7=tls/,/^[[:space:]]*--new[[:space:]]*$/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)fake_default_tls#\1maxru#g; }' "$cfg"
     sed -i -E "s#(${prefix})[^[:space:]]+#\\1${selected_blob}#g" "$cfg"
   else
-    sed -i -r '/--filter-l7=tls/,/^[[:space:]]*--new[[:space:]]*$/ s#(--lua-desync=[^[:space:]]*fake:blob=)fake_default_tls#\1maxru#g' "$cfg"
+    sed -i -r '/--filter-l7=tls/,/^[[:space:]]*--new[[:space:]]*$/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)fake_default_tls#\1maxru#g; }' "$cfg"
     sed -i -r "s#(${prefix})[^[:space:]]+#\\1${selected_blob}#g" "$cfg"
   fi
   echo -e "${green}Обновлено: --blob=maxru -> ${selected_blob}${plain}"
