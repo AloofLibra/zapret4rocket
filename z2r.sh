@@ -702,6 +702,18 @@ get_repo() {
   curl -L -o /opt/zapret2/extra_strats/TCP_YT_list.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/TCP/YT/List.txt
   curl -L -o /opt/zapret2/extra_strats/TCP_GV_list.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/TCP/GV/List.txt
   curl -L -o /opt/zapret2/extra_strats/TCP_Discord.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/TCP/RKN/Discord.txt
+  if [ ! -f /opt/zapret2/files/fake/custom_tls.bin ]; then
+    mkdir -p /opt/zapret2/files/fake
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsSL -o /opt/zapret2/files/fake/custom_tls.bin \
+        https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/fake/custom_tls.bin
+    elif command -v wget >/dev/null 2>&1; then
+      wget -qO /opt/zapret2/files/fake/custom_tls.bin \
+        https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/fake/custom_tls.bin
+    else
+      echo -e "${yellow}Не удалось скачать custom_tls.bin: нет curl/wget.${plain}"
+    fi
+  fi
   touch /opt/zapret2/lists/autohostlist.txt
   if [ -d /opt/extra_strats ]; then
     rm -rf /opt/zapret2/extra_strats
