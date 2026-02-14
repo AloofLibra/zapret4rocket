@@ -21,14 +21,15 @@ strategies_submenu() {
     echo -e "  Текущие стратегии [${strategies_status}]"
     echo -e 
 
-    submenu_item "	1" "Профиль 1: TCP 80/443 (YouTube) [${p1_max:-0}]" "tls+http"
+    submenu_item "	1" "Профиль 1: TCP 80/443 (YouTube) [${p1_max:-0}]" "tls"
     submenu_item "	2" "Профиль 2: TCP 80/443 (Googlevideo) [${p2_max:-0}]" "tls"
     submenu_item "	3" "Профиль 3: TCP 80/443 (RKN) [${p3_max:-0}]" "tls"
     submenu_item "	4" "Профиль 4: TCP 80/443 (Discord) [${p4_max:-0}]" "tls"
     submenu_item "	5" "Профиль 5: UDP 443 (YouTube QUIC) [${p5_max:-0}]" "udp"
     submenu_item "	6" "Профиль 6: UDP Voice (Discord/STUN) [${p6_max:-0}]" "udp"
     submenu_item "	7" "Профиль 7: MTProto/Telegram [${p7_max:-0}]" "tls"
-    submenu_item "	8" "Добавить домен в RKN список (с/без подбора стратегии)"
+    submenu_item "	8" "Fallback (безразборный блок)"
+    submenu_item "	9" "Добавить домен в RKN список (с/без подбора стратегии)"
     submenu_item "	0" "Назад"
     echo ""
 
@@ -59,6 +60,9 @@ strategies_submenu() {
         orch_profile_try "7" "Профиль 7: MTProto/Telegram" "tls" "https://telegram.org/"
         ;;
       "8")
+        fallback_profile_try
+        ;;
+      "9")
         manage_custom_rkn_domain
         ;;
       "0"|"")
