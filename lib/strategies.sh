@@ -205,17 +205,33 @@ orch_profile_try() {
 }
 
 get_orchestra_locks_info() {
-    local p1_tls="" p1_http="" p2_tls="" p3_tls="" p4_tls="" p5_udp="" p6_udp="" p7_tls=""
-    p1_tls="$(orch_locked_get 1 tls)"
-    p1_http="$(orch_locked_get 1 http)"
-    p2_tls="$(orch_locked_get 2 tls)"
-    p3_tls="$(orch_locked_get 3 tls)"
-    p4_tls="$(orch_locked_get 4 tls)"
-    p5_udp="$(orch_locked_get 5 udp)"
-    p6_udp="$(orch_locked_get 6 udp)"
-    p7_tls="$(orch_locked_get 7 tls)"
-    printf "P1(tls=%s,http=%s) P2(tls=%s) P3(tls=%s) P4(tls=%s) P5(udp=%s) P6(udp=%s) P7(tls=%s)" \
-        "${p1_tls:-0}" "${p1_http:-0}" "${p2_tls:-0}" "${p3_tls:-0}" "${p4_tls:-0}" "${p5_udp:-0}" "${p6_udp:-0}" "${p7_tls:-0}"
+    local yt_tls="" gv_tls="" rkn_tls="" ds_tls="" yt_quic_udp="" voice_udp="" tg_tls=""
+    local v=""
+    yt_tls="$(orch_locked_get 1 tls)"
+    gv_tls="$(orch_locked_get 2 tls)"
+    rkn_tls="$(orch_locked_get 3 tls)"
+    ds_tls="$(orch_locked_get 4 tls)"
+    yt_quic_udp="$(orch_locked_get 5 udp)"
+    voice_udp="$(orch_locked_get 6 udp)"
+    tg_tls="$(orch_locked_get 7 tls)"
+
+    fmt_status_num() {
+        v="${1:-0}"
+        if [ "$v" = "0" ]; then
+            printf "%b" "${Fyellow}0${plain}"
+        else
+            printf "%b" "${Fcyan}${v}${plain}"
+        fi
+    }
+
+    printf "YT_TLS=%s GV_TLS=%s RKN_TLS=%s DS_TLS=%s YT_QUIC_UDP=%s VOICE_UDP=%s TG_TLS=%s" \
+        "$(fmt_status_num "$yt_tls")" \
+        "$(fmt_status_num "$gv_tls")" \
+        "$(fmt_status_num "$rkn_tls")" \
+        "$(fmt_status_num "$ds_tls")" \
+        "$(fmt_status_num "$yt_quic_udp")" \
+        "$(fmt_status_num "$voice_udp")" \
+        "$(fmt_status_num "$tg_tls")"
 }
 
 manage_custom_rkn_domain() {
