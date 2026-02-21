@@ -128,7 +128,7 @@ NFQWS2_OPT="
 --filter-tcp=443 --filter-l7=tls
 --hostlist-domains=googlevideo.com
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello 
---out-range=-s34228 
+--out-range=-s342 
 --in-range=-s32768 --lua-desync=circular_locked:key=2
 --in-range=x 
 --payload=tls_client_hello
