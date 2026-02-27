@@ -196,8 +196,7 @@ NFQWS2_OPT="
 --lua-desync=multisplit:blob=fake_default_tls:tcp_ts=-1000:pos=2:nodrop:strategy=24 --lua-desync=fakeddisorder:pos=endsld:tcp_ts=-1000:strategy=24
 --lua-desync=fake:blob=fake_default_tls:tcp_ts=-500:repeats=2:strategy=25 --lua-desync=multisplit:pos=1,midsld:strategy=25
 --lua-desync=multisplit:seqovl=666:seqovl_pattern=custom:strategy=26 --lua-desync=multidisorder:pos=1,midsld:strategy=26
- 
-  --new
+--new
 
 #Отдельные стратегии для TCP_Discord
 --filter-tcp=80,443,2053,2083,2087,2096,8443 --hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt
@@ -234,7 +233,7 @@ NFQWS2_OPT="
 --lua-desync=multisplit:seqovl=666:seqovl_pattern=custom:strategy=26 --lua-desync=multidisorder:pos=1,midsld:strategy=26
 
 
-  --new
+--new
 
 #Стратегии для UDP_YT
 --filter-udp=443 --hostlist=/opt/zapret2/extra_strats/UDP_YT_list.txt
