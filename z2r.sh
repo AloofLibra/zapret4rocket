@@ -859,7 +859,7 @@ entware_fixes() {
   curl -L -o /opt/zapret2/init.d/sysv/zapret2 https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z2r/Entware/zapret
   chmod +x /opt/zapret2/init.d/sysv/zapret2
   echo "Права выданы /opt/zapret2/init.d/sysv/zapret2"
-  curl -L -o /opt/etc/ndm/netfilter.d/000-zapret.sh https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z2r/Entware/000-zapret.sh
+  curl -L -o /opt/etc/ndm/netfilter.d/000-zapret.sh https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/Entware/000-zapret.sh
   chmod +x /opt/etc/ndm/netfilter.d/000-zapret.sh
   echo "Права выданы /opt/etc/ndm/netfilter.d/000-zapret.sh"
   curl -L -o /opt/etc/init.d/S00fix https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z2r/Entware/S00fix
