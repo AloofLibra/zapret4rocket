@@ -444,7 +444,7 @@ api_blockcheck_profile_start() {
   local job_id
   job_id="$(blockcheck_job_create)"
   blockcheck_job_write_running "$job_id"
-  nohup sh "$WEBUI_CGI/blockcheck-worker.sh" "$job_id" profile "$PARAM_PROFILE" "" >/dev/null 2>&1 &
+  nohup "$WEBUI_CGI/blockcheck-worker.sh" "$job_id" profile "$PARAM_PROFILE" "" >/dev/null 2>&1 &
   send_json "200 OK" "{\"job_id\":\"$job_id\",\"status\":\"running\"}"
 }
 
@@ -457,7 +457,7 @@ api_blockcheck_custom_start() {
   local job_id
   job_id="$(blockcheck_job_create)"
   blockcheck_job_write_running "$job_id"
-  nohup sh "$WEBUI_CGI/blockcheck-worker.sh" "$job_id" custom "${PARAM_PROFILE:-auto}" "$PARAM_TARGET" >/dev/null 2>&1 &
+  nohup "$WEBUI_CGI/blockcheck-worker.sh" "$job_id" custom "${PARAM_PROFILE:-auto}" "$PARAM_TARGET" >/dev/null 2>&1 &
   send_json "200 OK" "{\"job_id\":\"$job_id\",\"status\":\"running\"}"
 }
 
