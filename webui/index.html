@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>z2r Web UI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">zeefeer4rocket</p>
+        <h1>z2r Web UI</h1>
+        <p class="subtitle">Лаконичное управление состоянием и стратегиями без терминала.</p>
+      </div>
+      <nav class="tabs">
+        <button class="tab is-active" data-view="status">Статус</button>
+        <button class="tab" data-view="strategies">Стратегии</button>
+      </nav>
+    </header>
+
+    <section class="banner" id="banner" hidden></section>
+
+    <section class="view is-active" id="view-status">
+      <div class="actions">
+        <button id="refresh-status">Обновить</button>
+        <button id="restart-service" class="primary">Перезапустить zapret2</button>
+        <button id="run-check">Проверить доступ</button>
+      </div>
+
+      <div class="stats-grid" id="status-cards"></div>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Профили</h2>
+          <button id="open-strategies" class="ghost">Открыть управление</button>
+        </div>
+        <div class="profile-grid compact" id="status-profiles"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Проверка доступа</h2>
+        </div>
+        <div id="check-results" class="checks empty">Нажмите "Проверить доступ", чтобы получить свежие результаты.</div>
+      </section>
+    </section>
+
+    <section class="view" id="view-strategies">
+      <div class="actions">
+        <button id="refresh-locks">Обновить</button>
+      </div>
+      <div class="profile-grid" id="strategy-cards"></div>
+    </section>
+  </main>
+
+  <template id="status-card-template">
+    <article class="stat-card">
+      <span class="label"></span>
+      <strong class="value"></strong>
+    </article>
+  </template>
+
+  <template id="status-profile-template">
+    <article class="profile-card">
+      <h3></h3>
+      <p class="desc"></p>
+      <div class="meta-line">
+        <span>Текущий lock</span>
+        <strong class="current-lock"></strong>
+      </div>
+    </article>
+  </template>
+
+  <template id="strategy-card-template">
+    <article class="profile-card">
+      <div class="card-top">
+        <div>
+          <h3></h3>
+          <p class="desc"></p>
+        </div>
+        <span class="chip"></span>
+      </div>
+      <div class="meta">
+        <div class="meta-line">
+          <span>Текущий lock</span>
+          <strong class="current-lock"></strong>
+        </div>
+        <div class="meta-line">
+          <span>Макс. стратегия</span>
+          <strong class="max-lock"></strong>
+        </div>
+      </div>
+      <form class="lock-form">
+        <label>
+          <span>Номер стратегии</span>
+          <input type="number" min="1" step="1" required>
+        </label>
+        <div class="card-actions">
+          <button type="submit" class="primary">Сохранить</button>
+          <button type="button" class="ghost clear-lock">Сбросить</button>
+        </div>
+      </form>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>

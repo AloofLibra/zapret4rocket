@@ -754,6 +754,7 @@ remove_zapret() {
  fi
  if [ -d "/opt/zapret2" ]; then
      echo "Удаляем папку zapret2"
+     webui_remove >/dev/null 2>&1 || true
      rm -rf /opt/zapret2
  else
      echo "Папка zapret2 не существует."
@@ -1014,6 +1015,291 @@ EOF
 }
 
 #Меню, проверка состояний и вывод с чтением ответа
+WEBUI_PORT="17682"
+WEBUI_ROOT="/opt/zapret2/webui"
+WEBUI_WWW="$WEBUI_ROOT/www"
+WEBUI_CGI="$WEBUI_ROOT/cgi-bin"
+WEBUI_RUNNER="$WEBUI_ROOT/run-webui.sh"
+WEBUI_STATUS_CACHE="/opt/zapret2/extra_strats/cache/webui"
+
+webui_repo_fetch() {
+  local rel="$1"
+  local dest="$2"
+  local local_src="$SCRIPT_DIR/webui/$rel"
+  local remote_url="https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/webui/$rel"
+
+  mkdir -p "$(dirname "$dest")"
+  if [ -f "$local_src" ]; then
+    cp -f "$local_src" "$dest"
+    return 0
+  fi
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL -o "$dest" "$remote_url"
+    return $?
+  fi
+  if command -v wget >/dev/null 2>&1; then
+    wget -qO "$dest" "$remote_url"
+    return $?
+  fi
+  echo -e "${red}Нет curl или wget для загрузки web UI.${plain}"
+  return 1
+}
+
+webui_has_busybox_httpd() {
+  if ! command -v busybox >/dev/null 2>&1; then
+    return 1
+  fi
+  busybox --list 2>/dev/null | grep -qx 'httpd'
+}
+
+webui_server_type() {
+  if command -v uhttpd >/dev/null 2>&1; then
+    echo "uhttpd"
+    return
+  fi
+  if webui_has_busybox_httpd; then
+    echo "busybox"
+    return
+  fi
+  echo "none"
+}
+
+webui_ensure_server_binary() {
+  if [ "$(webui_server_type)" != "none" ]; then
+    return 0
+  fi
+
+  if command -v opkg >/dev/null 2>&1; then
+    opkg install uhttpd 2>/dev/null || opkg install busybox 2>/dev/null || true
+  elif command -v apk >/dev/null 2>&1; then
+    apk add uhttpd busybox 2>/dev/null || apk add busybox 2>/dev/null || true
+  elif command -v apt-get >/dev/null 2>&1; then
+    apt-get update 2>/dev/null || true
+    apt-get install -y busybox-static 2>/dev/null || apt-get install -y busybox 2>/dev/null || true
+  elif command -v pacman >/dev/null 2>&1; then
+    pacman -Sy --noconfirm busybox 2>/dev/null || true
+  fi
+
+  if [ "$(webui_server_type)" = "none" ]; then
+    echo -e "${red}Не удалось найти или установить uhttpd/busybox httpd для web UI.${plain}"
+    return 1
+  fi
+  return 0
+}
+
+webui_install_files() {
+  mkdir -p "$WEBUI_ROOT" "$WEBUI_WWW" "$WEBUI_CGI" "$WEBUI_STATUS_CACHE"
+
+  webui_repo_fetch "index.html" "$WEBUI_WWW/index.html" || return 1
+  webui_repo_fetch "styles.css" "$WEBUI_WWW/styles.css" || return 1
+  webui_repo_fetch "app.js" "$WEBUI_WWW/app.js" || return 1
+  webui_repo_fetch "run-webui.sh" "$WEBUI_RUNNER" || return 1
+  webui_repo_fetch "cgi-bin/_lib.sh" "$WEBUI_CGI/_lib.sh" || return 1
+  webui_repo_fetch "cgi-bin/status.cgi" "$WEBUI_CGI/status.cgi" || return 1
+  webui_repo_fetch "cgi-bin/locks.cgi" "$WEBUI_CGI/locks.cgi" || return 1
+  webui_repo_fetch "cgi-bin/set-lock.cgi" "$WEBUI_CGI/set-lock.cgi" || return 1
+  webui_repo_fetch "cgi-bin/clear-lock.cgi" "$WEBUI_CGI/clear-lock.cgi" || return 1
+  webui_repo_fetch "cgi-bin/restart.cgi" "$WEBUI_CGI/restart.cgi" || return 1
+  webui_repo_fetch "cgi-bin/check.cgi" "$WEBUI_CGI/check.cgi" || return 1
+  webui_repo_fetch "cgi-bin/meta.cgi" "$WEBUI_CGI/meta.cgi" || return 1
+
+  chmod +x "$WEBUI_RUNNER" "$WEBUI_CGI"/*.sh "$WEBUI_CGI"/*.cgi
+  ln -sfn ../cgi-bin "$WEBUI_WWW/cgi-bin"
+}
+
+webui_install_service() {
+  mkdir -p "$WEBUI_STATUS_CACHE"
+
+  case "$OSystem" in
+    "WRT")
+      cat > /etc/init.d/z2r-webui <<'EOF'
+#!/bin/sh /etc/rc.common
+START=95
+STOP=10
+USE_PROCD=1
+
+start_service() {
+  procd_open_instance
+  procd_set_param command /opt/zapret2/webui/run-webui.sh run
+  procd_set_param stdout 1
+  procd_set_param stderr 1
+  procd_close_instance
+}
+
+stop_service() {
+  /opt/zapret2/webui/run-webui.sh stop >/dev/null 2>&1 || true
+}
+EOF
+      chmod +x /etc/init.d/z2r-webui
+      /etc/init.d/z2r-webui enable 2>/dev/null || true
+      ;;
+    "entware")
+      cat > /opt/etc/init.d/S92z2r-webui <<'EOF'
+#!/bin/sh
+case "$1" in
+  start) /opt/zapret2/webui/run-webui.sh start ;;
+  stop) /opt/zapret2/webui/run-webui.sh stop ;;
+  restart) /opt/zapret2/webui/run-webui.sh restart ;;
+  status) /opt/zapret2/webui/run-webui.sh status ;;
+  *) echo "usage: $0 {start|stop|restart|status}"; exit 1 ;;
+esac
+EOF
+      chmod +x /opt/etc/init.d/S92z2r-webui
+      ;;
+    *)
+      if command -v systemctl >/dev/null 2>&1 && [ -d /etc/systemd/system ]; then
+        cat > /etc/systemd/system/z2r-webui.service <<'EOF'
+[Unit]
+Description=z2r Web UI
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/zapret2/webui/run-webui.sh run
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        systemctl daemon-reload 2>/dev/null || true
+        systemctl enable z2r-webui.service 2>/dev/null || true
+      else
+        cat > "$WEBUI_ROOT/run.sh" <<'EOF'
+#!/bin/sh
+/opt/zapret2/webui/run-webui.sh start
+EOF
+        chmod +x "$WEBUI_ROOT/run.sh"
+      fi
+      ;;
+  esac
+}
+
+webui_start_service() {
+  case "$OSystem" in
+    "WRT")
+      /etc/init.d/z2r-webui start
+      ;;
+    "entware")
+      /opt/etc/init.d/S92z2r-webui start
+      ;;
+    *)
+      if command -v systemctl >/dev/null 2>&1 && [ -f /etc/systemd/system/z2r-webui.service ]; then
+        systemctl restart z2r-webui.service
+      else
+        "$WEBUI_RUNNER" restart >/dev/null 2>&1 || "$WEBUI_RUNNER" start >/dev/null 2>&1
+      fi
+      ;;
+  esac
+}
+
+webui_stop_service() {
+  case "$OSystem" in
+    "WRT")
+      [ -f /etc/init.d/z2r-webui ] && /etc/init.d/z2r-webui stop >/dev/null 2>&1 || true
+      ;;
+    "entware")
+      [ -f /opt/etc/init.d/S92z2r-webui ] && /opt/etc/init.d/S92z2r-webui stop >/dev/null 2>&1 || true
+      ;;
+    *)
+      if command -v systemctl >/dev/null 2>&1 && [ -f /etc/systemd/system/z2r-webui.service ]; then
+        systemctl stop z2r-webui.service >/dev/null 2>&1 || true
+      fi
+      [ -x "$WEBUI_RUNNER" ] && "$WEBUI_RUNNER" stop >/dev/null 2>&1 || true
+      ;;
+  esac
+}
+
+webui_status_text() {
+  if [ -x "$WEBUI_RUNNER" ]; then
+    "$WEBUI_RUNNER" status 2>/dev/null || echo "stopped:none:${WEBUI_PORT}"
+  else
+    echo "stopped:none:${WEBUI_PORT}"
+  fi
+}
+
+webui_print_urls() {
+  if [ -x "$WEBUI_RUNNER" ]; then
+    "$WEBUI_RUNNER" urls 2>/dev/null || true
+  else
+    echo "http://127.0.0.1:${WEBUI_PORT}"
+  fi
+}
+
+webui_show_status() {
+  local status_line
+  status_line="$(webui_status_text)"
+  echo -e "${yellow}Web UI: ${plain}${status_line}"
+  echo -e "${yellow}URL примеры:${plain}"
+  webui_print_urls
+}
+
+webui_install() {
+  webui_ensure_server_binary || return 1
+  webui_install_files || return 1
+  webui_install_service || return 1
+  webui_start_service || return 1
+  echo -e "${green}Web UI установлен.${plain}"
+  webui_show_status
+}
+
+webui_remove() {
+  webui_stop_service
+  case "$OSystem" in
+    "WRT")
+      [ -f /etc/init.d/z2r-webui ] && rm -f /etc/init.d/z2r-webui
+      ;;
+    "entware")
+      [ -f /opt/etc/init.d/S92z2r-webui ] && rm -f /opt/etc/init.d/S92z2r-webui
+      ;;
+    *)
+      if command -v systemctl >/dev/null 2>&1 && [ -f /etc/systemd/system/z2r-webui.service ]; then
+        systemctl disable z2r-webui.service >/dev/null 2>&1 || true
+        rm -f /etc/systemd/system/z2r-webui.service
+        systemctl daemon-reload >/dev/null 2>&1 || true
+      fi
+      ;;
+  esac
+  rm -rf "$WEBUI_ROOT"
+  echo -e "${green}Web UI удалён.${plain}"
+}
+
+webui_submenu() {
+  while true; do
+    clear
+    echo -e "${cyan}--- Web UI ---${plain}"
+    echo -e "${yellow}Состояние: ${plain}$(webui_status_text)"
+    echo ""
+    submenu_item "1" "Установить/обновить Web UI"
+    submenu_item "2" "Показать статус и URL"
+    submenu_item "3" "Удалить Web UI"
+    submenu_item "0" "Назад"
+    echo ""
+    read -re -p "Ваш выбор: " webui_answer
+    case "$webui_answer" in
+      "1")
+        webui_install
+        pause_enter
+        ;;
+      "2")
+        webui_show_status
+        pause_enter
+        ;;
+      "3")
+        webui_remove
+        pause_enter
+        ;;
+      "0"|"")
+        return
+        ;;
+      *)
+        echo -e "${yellow}Неверный ввод.${plain}"
+        sleep 1
+        ;;
+    esac
+  done
+}
+
 get_menu() {
     TITLE_MENU_LINE=""
     if [[ -s "$PREMIUM_TITLE_FILE" ]]; then
@@ -1214,8 +1500,7 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "14")
-    ttyd_webssh
-    pause_enter
+    webui_submenu
     ;;
 
   "15")
@@ -1322,7 +1607,7 @@ version_select
 read -re -p $'\033[33mАктивировать доступ в меню через браузер (~3мб места)? 1 - Да, Enter - нет\033[0m\n' ttyd_answer
 case "$ttyd_answer" in
 	"1")
-		ttyd_webssh
+		webui_install
 	;;
 	*)
 		echo "Пропуск (пере)установки web-терминала"
