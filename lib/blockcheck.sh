@@ -3,6 +3,28 @@ BLOCKCHECK_RESULTS_FILE="$BLOCKCHECK_DIR/results.tsv"
 BLOCKCHECK_LAST_RECOMMENDATION_FILE="$BLOCKCHECK_DIR/last_recommendations.json"
 BLOCKCHECK_HISTORY_DIR="$BLOCKCHECK_DIR/history"
 
+blockcheck_progress_write() {
+    [ -n "${BLOCKCHECK_PROGRESS_FILE:-}" ] || return 0
+    local phase="$1"
+    local profile_id="$2"
+    local profile_name="$3"
+    local target="$4"
+    local current="$5"
+    local total="$6"
+    local strategy="$7"
+    local result="${8:-}"
+    local reason="${9:-}"
+    cat > "$BLOCKCHECK_PROGRESS_FILE" <<EOF
+{"status":"running","phase":"$(blockcheck_json_escape "$phase")","profile_id":"$(blockcheck_json_escape "$profile_id")","profile_name":"$(blockcheck_json_escape "$profile_name")","target":"$(blockcheck_json_escape "$target")","current":$current,"total":$total,"strategy":${strategy:-null},"last_result":"$(blockcheck_json_escape "$result")","last_reason":"$(blockcheck_json_escape "$reason")"}
+EOF
+}
+
+blockcheck_log_progress() {
+    local message="$1"
+    [ -n "$message" ] || return 0
+    printf '%s\n' "$message"
+}
+
 blockcheck_init_dirs() {
     mkdir -p "$BLOCKCHECK_DIR" "$BLOCKCHECK_HISTORY_DIR"
     touch "$BLOCKCHECK_RESULTS_FILE"
@@ -282,10 +304,13 @@ blockcheck_run_scan() {
     run_file="$BLOCKCHECK_HISTORY_DIR/${run_id}.tsv"
     summary_file="$BLOCKCHECK_HISTORY_DIR/${run_id}.summary"
     : > "$run_file"
+    blockcheck_progress_write "prepare" "$profile_id" "$profile_name" "$target" 0 "${max:-0}" null "" ""
+    blockcheck_log_progress "Blockcheck: подготовка профиля $profile_id ($profile_name)"
 
     if ! blockcheck_profile_supported "$profile_id"; then
         blockcheck_write_unsupported_recommendation "$mode" "$profile_id" "$profile_name" "$target" "$run_file" "$summary_file"
         BLOCKCHECK_LAST_RUN_FILE="$run_file"
+        blockcheck_progress_write "unsupported" "$profile_id" "$profile_name" "$target" 0 0 null "skipped" "unsupported_profile"
         return 0
     fi
 
@@ -299,6 +324,8 @@ blockcheck_run_scan() {
     fallback="$(blockcheck_fallback_text)"
 
     for strategy in $(seq 1 "$max"); do
+        blockcheck_progress_write "testing" "$profile_id" "$profile_name" "$target" "$strategy" "$max" "$strategy" "" ""
+        blockcheck_log_progress "Blockcheck: стратегия $strategy из $max для профиля $profile_id"
         orch_locked_set "$profile_id" "$proto" "$strategy"
         if type sync_orchestra >/dev/null 2>&1; then
             sync_orchestra
@@ -307,6 +334,8 @@ blockcheck_run_scan() {
         IFS=$'\t' read -r result reason elapsed <<EOF
 $(blockcheck_run_http_probe "$target")
 EOF
+        blockcheck_progress_write "testing" "$profile_id" "$profile_name" "$target" "$strategy" "$max" "$strategy" "$result" "$reason"
+        blockcheck_log_progress "Blockcheck: стратегия $strategy -> $result ($reason)"
         blockcheck_append_result_line "$run_file" "$ts" "$mode" "$profile_id" "$profile_name" "$target" "$strategy" "$result" "$reason" "$elapsed" "$blob" "$hostlist" "$fallback"
         blockcheck_append_result_line "$BLOCKCHECK_RESULTS_FILE" "$ts" "$mode" "$profile_id" "$profile_name" "$target" "$strategy" "$result" "$reason" "$elapsed" "$blob" "$hostlist" "$fallback"
     done
@@ -319,6 +348,8 @@ EOF
     if type sync_orchestra >/dev/null 2>&1; then
         sync_orchestra
     fi
+    blockcheck_progress_write "finalize" "$profile_id" "$profile_name" "$target" "$max" "$max" null "" ""
+    blockcheck_log_progress "Blockcheck: восстановление исходного lock и расчёт рекомендации"
     blockcheck_compute_recommendation "$run_file" "$mode" "$profile_id" "$profile_name" "$target" "$current_lock" "$summary_file"
     BLOCKCHECK_LAST_RUN_FILE="$run_file"
 }

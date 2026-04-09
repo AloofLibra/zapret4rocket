@@ -49,8 +49,29 @@ async function waitForBlockcheckJob(jobId) {
       state.blockcheckJobId = null;
       throw new Error(payload.error || 'Blockcheck job failed');
     }
+    renderBlockcheckProgress(payload);
     await new Promise((resolve) => window.setTimeout(resolve, 1500));
   }
+}
+
+function renderBlockcheckProgress(payload) {
+  const container = document.getElementById('blockcheck-results');
+  const current = payload.current || 0;
+  const total = payload.total || 0;
+  const strategy = payload.strategy ?? '-';
+  container.classList.remove('empty');
+  container.innerHTML = `
+    <article class="check-item recommendation">
+      <strong>Проверка выполняется</strong>
+      <span>Профиль: ${payload.profile_name || payload.profile_id || '-'}</span>
+      <span>Цель: ${payload.target || '-'}</span>
+      <span>Этап: ${payload.phase || 'running'}</span>
+      <span>Прогресс: ${current}/${total}</span>
+      <span>Стратегия: ${strategy}</span>
+      <span>Последний результат: ${payload.last_result || '-'}</span>
+      <span>${payload.last_reason || ''}</span>
+    </article>
+  `;
 }
 
 function switchView(view) {

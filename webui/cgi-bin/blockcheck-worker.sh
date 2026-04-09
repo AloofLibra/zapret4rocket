@@ -8,6 +8,8 @@ target="${4:-}"
 
 [ -n "$job_id" ] || exit 1
 job_file="$(blockcheck_job_file "$job_id")"
+BLOCKCHECK_PROGRESS_FILE="$job_file"
+export BLOCKCHECK_PROGRESS_FILE
 
 write_error() {
   cat > "$job_file" <<EOF
