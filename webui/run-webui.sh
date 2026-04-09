@@ -41,6 +41,36 @@ is_running() {
   kill -0 "$pid" 2>/dev/null
 }
 
+has_port_listener() {
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn 2>/dev/null | grep -q "[\:\.]${PORT}[[:space:]]"
+    return
+  fi
+  if command -v netstat >/dev/null 2>&1; then
+    netstat -ltn 2>/dev/null | grep -q "[\:\.]${PORT}[[:space:]]"
+    return
+  fi
+  return 1
+}
+
+has_matching_process() {
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -f "uhttpd.*${WEBUI_WWW}" >/dev/null 2>&1 && return 0
+    pgrep -f "busybox httpd.*${WEBUI_WWW}" >/dev/null 2>&1 && return 0
+  fi
+  if command -v ps >/dev/null 2>&1; then
+    ps w 2>/dev/null | grep -F "$WEBUI_WWW" | grep -E "uhttpd|busybox httpd" | grep -v grep >/dev/null 2>&1 && return 0
+  fi
+  return 1
+}
+
+is_running_any() {
+  is_running && return 0
+  has_matching_process && return 0
+  has_port_listener && return 0
+  return 1
+}
+
 run_server() {
   local server
   server="$(detect_server)"
@@ -60,7 +90,7 @@ run_server() {
 
 start_server() {
   ensure_dirs
-  if is_running; then
+  if is_running_any; then
     echo "already running"
     return 0
   fi
@@ -82,12 +112,16 @@ stop_server() {
       kill -9 "$(cat "$PID_FILE")" 2>/dev/null || true
     fi
   fi
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -f "uhttpd.*${WEBUI_WWW}" >/dev/null 2>&1 && pkill -f "uhttpd.*${WEBUI_WWW}" 2>/dev/null || true
+    pgrep -f "busybox httpd.*${WEBUI_WWW}" >/dev/null 2>&1 && pkill -f "busybox httpd.*${WEBUI_WWW}" 2>/dev/null || true
+  fi
   rm -f "$PID_FILE"
   echo "stopped"
 }
 
 status_server() {
-  if is_running; then
+  if is_running_any; then
     echo "running:$(detect_server):${PORT}"
   else
     echo "stopped:$(detect_server):${PORT}"
