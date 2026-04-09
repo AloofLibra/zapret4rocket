@@ -3,7 +3,9 @@
 set -u
 
 WEBUI_ROOT="/opt/zapret2/webui"
+WEBUI_CGI="$WEBUI_ROOT/cgi-bin"
 ZAPRET_ROOT="/opt/zapret2"
+BLOCKCHECK_JOBS_DIR="/opt/zapret2/extra_strats/cache/blockcheck2/jobs"
 CONFIG_FILE="$ZAPRET_ROOT/config"
 CONFIG_DEFAULT_FILE="$ZAPRET_ROOT/config.default"
 ORCH_DIR="$ZAPRET_ROOT/extra_strats/cache/orchestra"
@@ -45,6 +47,7 @@ parse_params() {
       profile) PARAM_PROFILE="$value" ;;
       strategy) PARAM_STRATEGY="$value" ;;
       target) PARAM_TARGET="$value" ;;
+      job) PARAM_JOB="$value" ;;
     esac
   done
 }
@@ -418,4 +421,51 @@ api_blockcheck_last() {
 api_blockcheck_apply() {
   blockcheck_apply_last_recommendation >/dev/null 2>&1 || send_error "400 Bad Request" "Нет применимой рекомендации"
   send_json "200 OK" "{\"ok\":true,\"recommendation\":$(blockcheck_last_json)}"
+}
+blockcheck_job_file() {
+  printf '%s/%s.json' "$BLOCKCHECK_JOBS_DIR" "$1"
+}
+
+blockcheck_job_create() {
+  mkdir -p "$BLOCKCHECK_JOBS_DIR"
+  printf 'bc_%s_%s' "$(date +%Y%m%d%H%M%S)" "$$"
+}
+
+blockcheck_job_write_running() {
+  local job_id="$1"
+  cat > "$(blockcheck_job_file "$job_id")" <<EOF
+{"job_id":"$job_id","status":"running"}
+EOF
+}
+
+api_blockcheck_profile_start() {
+  parse_params
+  [[ "${PARAM_PROFILE:-}" =~ ^[1-7]$ ]] || send_error "400 Bad Request" "Некорректный профиль"
+  local job_id
+  job_id="$(blockcheck_job_create)"
+  blockcheck_job_write_running "$job_id"
+  nohup sh "$WEBUI_CGI/blockcheck-worker.sh" "$job_id" profile "$PARAM_PROFILE" "" >/dev/null 2>&1 &
+  send_json "200 OK" "{\"job_id\":\"$job_id\",\"status\":\"running\"}"
+}
+
+api_blockcheck_custom_start() {
+  parse_params
+  [ -n "${PARAM_TARGET:-}" ] || send_error "400 Bad Request" "Пустая цель проверки"
+  if [ -n "${PARAM_PROFILE:-}" ] && [ "$PARAM_PROFILE" != "auto" ]; then
+    [[ "${PARAM_PROFILE:-}" =~ ^[1-7]$ ]] || send_error "400 Bad Request" "Некорректный профиль"
+  fi
+  local job_id
+  job_id="$(blockcheck_job_create)"
+  blockcheck_job_write_running "$job_id"
+  nohup sh "$WEBUI_CGI/blockcheck-worker.sh" "$job_id" custom "${PARAM_PROFILE:-auto}" "$PARAM_TARGET" >/dev/null 2>&1 &
+  send_json "200 OK" "{\"job_id\":\"$job_id\",\"status\":\"running\"}"
+}
+
+api_blockcheck_job() {
+  parse_params
+  [ -n "${PARAM_JOB:-}" ] || send_error "400 Bad Request" "Не указан job id"
+  local file
+  file="$(blockcheck_job_file "$PARAM_JOB")"
+  [ -f "$file" ] || send_error "404 Not Found" "Job не найден"
+  send_json "200 OK" "$(cat "$file")"
 }

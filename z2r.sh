@@ -1112,6 +1112,10 @@ webui_install_files() {
   webui_repo_fetch "cgi-bin/blockcheck-custom.cgi" "$WEBUI_CGI/blockcheck-custom.cgi" || return 1
   webui_repo_fetch "cgi-bin/blockcheck-last.cgi" "$WEBUI_CGI/blockcheck-last.cgi" || return 1
   webui_repo_fetch "cgi-bin/blockcheck-apply.cgi" "$WEBUI_CGI/blockcheck-apply.cgi" || return 1
+  webui_repo_fetch "cgi-bin/blockcheck-worker.sh" "$WEBUI_CGI/blockcheck-worker.sh" || return 1
+  webui_repo_fetch "cgi-bin/blockcheck-profile-start.cgi" "$WEBUI_CGI/blockcheck-profile-start.cgi" || return 1
+  webui_repo_fetch "cgi-bin/blockcheck-custom-start.cgi" "$WEBUI_CGI/blockcheck-custom-start.cgi" || return 1
+  webui_repo_fetch "cgi-bin/blockcheck-job.cgi" "$WEBUI_CGI/blockcheck-job.cgi" || return 1
 
   chmod +x "$WEBUI_RUNNER" "$WEBUI_CGI"/*.sh "$WEBUI_CGI"/*.cgi
   ln -sfn ../cgi-bin "$WEBUI_WWW/cgi-bin"

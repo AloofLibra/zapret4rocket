@@ -75,17 +75,12 @@ blockcheck_blob_text() {
 }
 
 blockcheck_restart_runtime() {
-    if type restart_zapret2 >/dev/null 2>&1; then
-        restart_zapret2 >/dev/null 2>&1 || true
+    if type sync_orchestra >/dev/null 2>&1; then
+        sync_orchestra >/dev/null 2>&1 || true
         return 0
     fi
-    if [ -n "${ZAPRET2_INIT:-}" ] && [ -f "$ZAPRET2_INIT" ]; then
-        "$ZAPRET2_INIT" restart >/dev/null 2>&1 || true
-    fi
-    if type orchestra_start >/dev/null 2>&1 && [ -f "${ORCH_ENABLED_FLAG:-/opt/zapret2/extra_strats/cache/orchestra/enabled}" ]; then
-        orchestra_start >/dev/null 2>&1 || true
-    elif [ -x "${ORCH_SCRIPT:-}" ] && [ -f "/opt/zapret2/extra_strats/cache/orchestra/enabled" ]; then
-        "$ORCH_SCRIPT" start >/dev/null 2>&1 || true
+    if [ -x "${ORCH_SCRIPT:-}" ]; then
+        "$ORCH_SCRIPT" sync >/dev/null 2>&1 || true
     fi
 }
 
@@ -308,7 +303,6 @@ blockcheck_run_scan() {
         if type sync_orchestra >/dev/null 2>&1; then
             sync_orchestra
         fi
-        blockcheck_restart_runtime
         sleep 1
         IFS=$'\t' read -r result reason elapsed <<EOF
 $(blockcheck_run_http_probe "$target")
@@ -325,7 +319,6 @@ EOF
     if type sync_orchestra >/dev/null 2>&1; then
         sync_orchestra
     fi
-    blockcheck_restart_runtime
     blockcheck_compute_recommendation "$run_file" "$mode" "$profile_id" "$profile_name" "$target" "$current_lock" "$summary_file"
     BLOCKCHECK_LAST_RUN_FILE="$run_file"
 }
@@ -401,7 +394,6 @@ blockcheck_apply_last_recommendation() {
     if type sync_orchestra >/dev/null 2>&1; then
         sync_orchestra
     fi
-    blockcheck_restart_runtime
     echo "Рекомендация применена: профиль $profile_id -> стратегия $best"
 }
 

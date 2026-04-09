@@ -3,6 +3,7 @@ const state = {
   status: null,
   blockcheckMeta: null,
   lastRecommendation: null,
+  blockcheckJobId: null,
 };
 
 const views = {
@@ -34,6 +35,22 @@ async function api(path, options = {}) {
     throw new Error(data.error || `HTTP ${response.status}`);
   }
   return data;
+}
+
+async function waitForBlockcheckJob(jobId) {
+  state.blockcheckJobId = jobId;
+  for (;;) {
+    const payload = await api(`/cgi-bin/blockcheck-job.cgi?job=${encodeURIComponent(jobId)}`);
+    if (payload.status === 'completed') {
+      state.blockcheckJobId = null;
+      return payload;
+    }
+    if (payload.status === 'error') {
+      state.blockcheckJobId = null;
+      throw new Error(payload.error || 'Blockcheck job failed');
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 1500));
+  }
 }
 
 function switchView(view) {
@@ -295,11 +312,12 @@ document.getElementById('blockcheck-profile-form').addEventListener('submit', as
   resultsContainer.classList.remove('empty');
   resultsContainer.textContent = 'Проверка выполняется...';
   try {
-    const payload = await api('/cgi-bin/blockcheck-profile.cgi', {
+    const started = await api('/cgi-bin/blockcheck-profile-start.cgi', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ profile }),
     });
+    const payload = await waitForBlockcheckJob(started.job_id);
     renderBlockcheckResults(payload.results);
     renderBlockcheckRecommendation(payload.recommendation);
     showBanner('Проверка профиля завершена.');
@@ -321,11 +339,12 @@ document.getElementById('blockcheck-custom-form').addEventListener('submit', asy
   resultsContainer.classList.remove('empty');
   resultsContainer.textContent = 'Проверка выполняется...';
   try {
-    const payload = await api('/cgi-bin/blockcheck-custom.cgi', {
+    const started = await api('/cgi-bin/blockcheck-custom-start.cgi', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ target, profile }),
     });
+    const payload = await waitForBlockcheckJob(started.job_id);
     renderBlockcheckResults(payload.results);
     renderBlockcheckRecommendation(payload.recommendation);
     showBanner('Кастомная проверка завершена.');
