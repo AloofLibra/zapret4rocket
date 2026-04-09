@@ -227,3 +227,50 @@ provider_submenu() {
     esac
   done
 }
+
+blockcheck_submenu() {
+  while true; do
+    clear
+    echo -e "${cyan}--- Blockcheck ---${plain}"
+    echo ""
+    submenu_item "1" "Проверить профиль"
+    submenu_item "2" "Проверить кастомный домен"
+    submenu_item "3" "Показать последние рекомендации"
+    submenu_item "4" "Применить последнюю рекомендацию"
+    submenu_item "5" "Открыть последний SUMMARY/лог"
+    submenu_item "0" "Назад"
+    echo ""
+
+    read -re -p "Ваш выбор: " ans
+
+    case "$ans" in
+      "1")
+        blockcheck_cli_profile_scan_menu
+        pause_enter
+        ;;
+      "2")
+        blockcheck_cli_custom_scan_menu
+        pause_enter
+        ;;
+      "3")
+        blockcheck_print_last_recommendation
+        pause_enter
+        ;;
+      "4")
+        blockcheck_apply_last_recommendation
+        pause_enter
+        ;;
+      "5")
+        blockcheck_show_last_summary
+        pause_enter
+        ;;
+      "0"|"")
+        return
+        ;;
+      *)
+        echo -e "${yellow}Неверный ввод.${plain}"
+        sleep 1
+        ;;
+    esac
+  done
+}

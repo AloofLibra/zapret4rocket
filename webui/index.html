@@ -12,11 +12,12 @@
       <div>
         <p class="eyebrow">zeefeer4rocket</p>
         <h1>z2r Web UI</h1>
-        <p class="subtitle">Лаконичное управление состоянием и стратегиями без терминала.</p>
+        <p class="subtitle">Лаконичное управление состоянием, стратегиями и blockcheck без терминала.</p>
       </div>
       <nav class="tabs">
         <button class="tab is-active" data-view="status">Статус</button>
         <button class="tab" data-view="strategies">Стратегии</button>
+        <button class="tab" data-view="blockcheck">Blockcheck</button>
       </nav>
     </header>
 
@@ -52,6 +53,62 @@
         <button id="refresh-locks">Обновить</button>
       </div>
       <div class="profile-grid" id="strategy-cards"></div>
+    </section>
+
+    <section class="view" id="view-blockcheck">
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Проверить профиль</h2>
+        </div>
+        <form id="blockcheck-profile-form" class="stack">
+          <label>
+            <span>Профиль</span>
+            <select id="blockcheck-profile-select"></select>
+          </label>
+          <div class="card-actions">
+            <button type="submit" class="primary">Запустить проверку</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Проверить домен</h2>
+        </div>
+        <form id="blockcheck-custom-form" class="stack">
+          <label>
+            <span>Домен или URL</span>
+            <input id="blockcheck-target" type="text" placeholder="https://example.com или example.com">
+          </label>
+          <label>
+            <span>Профиль</span>
+            <select id="blockcheck-custom-profile">
+              <option value="auto">auto (Blocked Sites)</option>
+            </select>
+          </label>
+          <div class="card-actions">
+            <button type="submit" class="primary">Запустить кастомную проверку</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Последние рекомендации</h2>
+          <button id="refresh-blockcheck" class="ghost">Обновить</button>
+        </div>
+        <div id="blockcheck-recommendation" class="checks empty">Рекомендаций пока нет.</div>
+        <div class="actions">
+          <button id="apply-blockcheck" class="primary">Применить рекомендацию</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Результаты последней проверки</h2>
+        </div>
+        <div id="blockcheck-results" class="checks empty">Запустите проверку профиля или домена.</div>
+      </section>
     </section>
   </main>
 

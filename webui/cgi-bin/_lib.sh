@@ -44,6 +44,7 @@ parse_params() {
     case "$key" in
       profile) PARAM_PROFILE="$value" ;;
       strategy) PARAM_STRATEGY="$value" ;;
+      target) PARAM_TARGET="$value" ;;
     esac
   done
 }
@@ -365,4 +366,56 @@ $(check_one_target_json "YouTube" "https://www.youtube.com/")
 ,$(check_one_target_json "Blocked Sites" "https://meduza.io")
 ,$(check_one_target_json "Instagram" "https://www.instagram.com/")
 ]}"
+}
+
+if [ -f "$ZAPRET_ROOT/z2r_lib/blockcheck.sh" ]; then
+  . "$ZAPRET_ROOT/z2r_lib/blockcheck.sh"
+fi
+
+blockcheck_rows_json() {
+  local file="$1"
+  [ -f "$file" ] || { printf '[]'; return; }
+  awk -F '\t' '
+    BEGIN { printf "["; first=1 }
+    NF >= 12 {
+      if (!first) printf ","
+      first=0
+      gsub(/\\/,"\\\\",$4); gsub(/"/,"\\\"",$4)
+      gsub(/\\/,"\\\\",$5); gsub(/"/,"\\\"",$5)
+      gsub(/\\/,"\\\\",$7); gsub(/"/,"\\\"",$7)
+      gsub(/\\/,"\\\\",$8); gsub(/"/,"\\\"",$8)
+      printf "{\"timestamp\":\"%s\",\"profile_name\":\"%s\",\"target\":\"%s\",\"strategy\":%s,\"result\":\"%s\",\"reason\":\"%s\",\"elapsed_ms\":%s}", $1, $4, $5, $6, $7, $8, $9
+    }
+    END { printf "]" }
+  ' "$file"
+}
+
+api_blockcheck_meta() {
+  send_json "200 OK" "{\"profiles\":$(all_profiles_json),\"modes\":[\"profile\",\"custom\"]}"
+}
+
+api_blockcheck_profile() {
+  parse_params
+  [[ "${PARAM_PROFILE:-}" =~ ^[1-7]$ ]] || send_error "400 Bad Request" "Некорректный профиль"
+  blockcheck_run_profile_scan "$PARAM_PROFILE" || send_error "500 Internal Server Error" "Не удалось выполнить проверку профиля"
+  send_json "200 OK" "{\"results\":$(blockcheck_rows_json "$BLOCKCHECK_LAST_RUN_FILE"),\"recommendation\":$(blockcheck_last_json)}"
+}
+
+api_blockcheck_custom() {
+  parse_params
+  [ -n "${PARAM_TARGET:-}" ] || send_error "400 Bad Request" "Пустая цель проверки"
+  if [ -n "${PARAM_PROFILE:-}" ] && [ "$PARAM_PROFILE" != "auto" ]; then
+    [[ "${PARAM_PROFILE:-}" =~ ^[1-7]$ ]] || send_error "400 Bad Request" "Некорректный профиль"
+  fi
+  blockcheck_run_custom_scan "$PARAM_TARGET" "${PARAM_PROFILE:-auto}" || send_error "500 Internal Server Error" "Не удалось выполнить кастомную проверку"
+  send_json "200 OK" "{\"results\":$(blockcheck_rows_json "$BLOCKCHECK_LAST_RUN_FILE"),\"recommendation\":$(blockcheck_last_json)}"
+}
+
+api_blockcheck_last() {
+  send_json "200 OK" "$(blockcheck_last_json)"
+}
+
+api_blockcheck_apply() {
+  blockcheck_apply_last_recommendation >/dev/null 2>&1 || send_error "400 Bad Request" "Нет применимой рекомендации"
+  send_json "200 OK" "{\"ok\":true,\"recommendation\":$(blockcheck_last_json)}"
 }

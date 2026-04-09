@@ -36,7 +36,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 # Проверяем наличие всех нужных lib-файлов, иначе запускаем внешний скрипт
 missing_libs=0
 LIB_DIR="$SCRIPT_DIR/zapret2/z2r_lib"
-for lib in ui.sh provider.sh telemetry.sh recommendations.sh netcheck.sh premium.sh strategies.sh submenus.sh actions.sh; do
+for lib in ui.sh provider.sh telemetry.sh recommendations.sh netcheck.sh premium.sh strategies.sh submenus.sh actions.sh blockcheck.sh; do
   if [ ! -f "$LIB_DIR/$lib" ]; then
     missing_libs=1
     break
@@ -94,6 +94,11 @@ source "$SCRIPT_DIR/zapret2/z2r_lib/submenus.sh"
 # Функции: backup_strats, menu_action_update_config_reset, menu_action_toggle_bolvan_ports,
 #          menu_action_toggle_fwtype, menu_action_toggle_udp_range, menu_action_set_tls_blob
 source "$SCRIPT_DIR/zapret2/z2r_lib/actions.sh" 
+
+# Blockcheck: профильные и кастомные проверки, рекомендации и их применение
+# Функции: blockcheck_run_profile_scan, blockcheck_run_custom_scan, blockcheck_print_last_recommendation,
+#          blockcheck_apply_last_recommendation, blockcheck_show_last_summary
+source "$SCRIPT_DIR/zapret2/z2r_lib/blockcheck.sh"
 
 detect_os() {
   if [[ -f /etc/os-release ]]; then
@@ -1102,6 +1107,11 @@ webui_install_files() {
   webui_repo_fetch "cgi-bin/restart.cgi" "$WEBUI_CGI/restart.cgi" || return 1
   webui_repo_fetch "cgi-bin/check.cgi" "$WEBUI_CGI/check.cgi" || return 1
   webui_repo_fetch "cgi-bin/meta.cgi" "$WEBUI_CGI/meta.cgi" || return 1
+  webui_repo_fetch "cgi-bin/blockcheck-meta.cgi" "$WEBUI_CGI/blockcheck-meta.cgi" || return 1
+  webui_repo_fetch "cgi-bin/blockcheck-profile.cgi" "$WEBUI_CGI/blockcheck-profile.cgi" || return 1
+  webui_repo_fetch "cgi-bin/blockcheck-custom.cgi" "$WEBUI_CGI/blockcheck-custom.cgi" || return 1
+  webui_repo_fetch "cgi-bin/blockcheck-last.cgi" "$WEBUI_CGI/blockcheck-last.cgi" || return 1
+  webui_repo_fetch "cgi-bin/blockcheck-apply.cgi" "$WEBUI_CGI/blockcheck-apply.cgi" || return 1
 
   chmod +x "$WEBUI_RUNNER" "$WEBUI_CGI"/*.sh "$WEBUI_CGI"/*.cgi
   ln -sfn ../cgi-bin "$WEBUI_WWW/cgi-bin"
@@ -1341,7 +1351,7 @@ Enter (без цифр) - переустановка/обновление zapret
 '"${Fcyan}"'01.'"${yellow}"' Проверить доступность сервисов (Тест не точен)
 '"${Fcyan}"'1.'"${yellow}"' Фиксация стратегии профиля/безразборного блока. Текущие: '"${plain}"'[ '"${strategies_status}"' ]'"${yellow}"' (fallback: '"${plain}"'['"$(fallback_strategy_text)"']'"${yellow}"')
 '"${Fcyan}"'2.'"${yellow}"' Стоп/пере(запуск) zapret2 (сейчас: '"$(pidof nfqws2 >/dev/null && echo "${green}Запущен${yellow}" || echo "${red}Остановлен${yellow}")"' | оркестратор: '"${plain}"'['"$(orchestra_status_text)"']'"${yellow}"')
-'"${Fcyan}"'3.'"${yellow}"' Запуск blockcheck2 и сохранение SUMMARY
+'"${Fcyan}"'3.'"${yellow}"' Blockcheck: профиль, домен, рекомендации
 '"${Fcyan}"'4.'"${yellow}"' Удалить zapret2
 '"${Fcyan}"'5.'"${yellow}"' Обновить стратегии, сбросить листы подбора стратегий и исключений (есть бэкап)
 '"${Fcyan}"'6.'"${yellow}"' Добавить домен в исключения
@@ -1407,8 +1417,7 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "3")
-    blockcheck2_run_summary
-    pause_enter
+    blockcheck_submenu
     ;;
 
   "4")

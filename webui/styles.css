@@ -28,7 +28,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -217,6 +218,19 @@ input {
   background: #fffdfa;
 }
 
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fffdfa;
+}
+
+.stack {
+  display: grid;
+  gap: 14px;
+}
+
 .checks {
   display: grid;
   gap: 10px;
@@ -231,6 +245,11 @@ input {
   border-radius: 14px;
   padding: 14px;
   background: var(--panel-strong);
+}
+
+.check-item.recommendation {
+  display: grid;
+  gap: 8px;
 }
 
 .check-title {

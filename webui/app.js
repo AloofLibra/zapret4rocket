@@ -1,12 +1,14 @@
 const state = {
-  meta: {},
   locks: [],
   status: null,
+  blockcheckMeta: null,
+  lastRecommendation: null,
 };
 
 const views = {
   status: document.getElementById('view-status'),
   strategies: document.getElementById('view-strategies'),
+  blockcheck: document.getElementById('view-blockcheck'),
 };
 
 function showBanner(message, type = 'success') {
@@ -159,17 +161,95 @@ function renderChecks(payload) {
   });
 }
 
+function populateBlockcheckForms() {
+  if (!state.blockcheckMeta) return;
+  const profileSelect = document.getElementById('blockcheck-profile-select');
+  const customSelect = document.getElementById('blockcheck-custom-profile');
+  profileSelect.innerHTML = '';
+  customSelect.innerHTML = '<option value="auto">auto (Blocked Sites)</option>';
+
+  state.blockcheckMeta.profiles.forEach((profile) => {
+    const option = document.createElement('option');
+    option.value = String(profile.profile);
+    option.textContent = `${profile.profile}. ${profile.label}`;
+    profileSelect.appendChild(option);
+
+    const customOption = option.cloneNode(true);
+    customSelect.appendChild(customOption);
+  });
+}
+
+function renderBlockcheckRecommendation(recommendation) {
+  const container = document.getElementById('blockcheck-recommendation');
+  state.lastRecommendation = recommendation;
+
+  if (!recommendation || !recommendation.profile_id) {
+    container.classList.add('empty');
+    container.textContent = 'Рекомендаций пока нет.';
+    return;
+  }
+
+  container.classList.remove('empty');
+  container.innerHTML = '';
+
+  const article = document.createElement('article');
+  article.className = 'check-item recommendation';
+  article.innerHTML = `
+    <strong>${recommendation.profile_name || 'Unknown'}</strong>
+    <span>Цель: ${recommendation.target || '-'}</span>
+    <span>Лучшая стратегия: ${recommendation.best_strategy ?? 'нет'}</span>
+    <span>Запасные: ${(recommendation.backup_strategies || []).join(', ') || 'нет'}</span>
+    <span>Неудачные: ${(recommendation.failed_strategies || []).join(', ') || 'нет'}</span>
+    <span>${recommendation.reason_summary || ''}</span>
+  `;
+  container.appendChild(article);
+}
+
+function renderBlockcheckResults(results) {
+  const container = document.getElementById('blockcheck-results');
+  if (!results || !results.length) {
+    container.classList.add('empty');
+    container.textContent = 'Данные последней проверки отсутствуют.';
+    return;
+  }
+
+  container.classList.remove('empty');
+  container.innerHTML = '';
+  results.forEach((item) => {
+    const article = document.createElement('article');
+    article.className = 'check-item';
+    article.innerHTML = `
+      <div class="check-title">
+        <strong>Стратегия ${item.strategy}</strong>
+        <span>${item.profile_name}</span>
+      </div>
+      <div class="check-pair">
+        <span class="${item.result === 'ok' ? 'ok' : item.result === 'unstable' ? 'ok' : 'bad'}">${item.result}</span>
+        <span>${item.reason}</span>
+        <span>${item.elapsed_ms} ms</span>
+      </div>
+      <div class="check-pair">
+        <span>${item.target}</span>
+      </div>
+    `;
+    container.appendChild(article);
+  });
+}
+
 async function refreshAll() {
-  const [meta, status, locks] = await Promise.all([
-    api('/cgi-bin/meta.cgi'),
+  const [status, locks, blockcheckMeta, lastRecommendation] = await Promise.all([
     api('/cgi-bin/status.cgi'),
     api('/cgi-bin/locks.cgi'),
+    api('/cgi-bin/blockcheck-meta.cgi'),
+    api('/cgi-bin/blockcheck-last.cgi'),
   ]);
-  state.meta = meta;
   state.status = status;
   state.locks = locks.profiles;
+  state.blockcheckMeta = blockcheckMeta;
   renderStatus();
   renderStrategies();
+  populateBlockcheckForms();
+  renderBlockcheckRecommendation(lastRecommendation);
 }
 
 document.querySelectorAll('.tab').forEach((tab) => {
@@ -179,6 +259,14 @@ document.querySelectorAll('.tab').forEach((tab) => {
 document.getElementById('open-strategies').addEventListener('click', () => switchView('strategies'));
 document.getElementById('refresh-status').addEventListener('click', () => refreshAll().catch((e) => showBanner(e.message, 'error')));
 document.getElementById('refresh-locks').addEventListener('click', () => refreshAll().catch((e) => showBanner(e.message, 'error')));
+document.getElementById('refresh-blockcheck').addEventListener('click', async () => {
+  try {
+    const payload = await api('/cgi-bin/blockcheck-last.cgi');
+    renderBlockcheckRecommendation(payload);
+  } catch (error) {
+    showBanner(error.message, 'error');
+  }
+});
 
 document.getElementById('restart-service').addEventListener('click', async () => {
   try {
@@ -195,6 +283,63 @@ document.getElementById('run-check').addEventListener('click', async () => {
     const payload = await api('/cgi-bin/check.cgi', { method: 'POST' });
     renderChecks(payload);
     showBanner('Проверка завершена.');
+  } catch (error) {
+    showBanner(error.message, 'error');
+  }
+});
+
+document.getElementById('blockcheck-profile-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const profile = document.getElementById('blockcheck-profile-select').value;
+  const resultsContainer = document.getElementById('blockcheck-results');
+  resultsContainer.classList.remove('empty');
+  resultsContainer.textContent = 'Проверка выполняется...';
+  try {
+    const payload = await api('/cgi-bin/blockcheck-profile.cgi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ profile }),
+    });
+    renderBlockcheckResults(payload.results);
+    renderBlockcheckRecommendation(payload.recommendation);
+    showBanner('Проверка профиля завершена.');
+    await refreshAll();
+  } catch (error) {
+    showBanner(error.message, 'error');
+  }
+});
+
+document.getElementById('blockcheck-custom-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const target = document.getElementById('blockcheck-target').value.trim();
+  const profile = document.getElementById('blockcheck-custom-profile').value;
+  if (!target) {
+    showBanner('Введите домен или URL.', 'error');
+    return;
+  }
+  const resultsContainer = document.getElementById('blockcheck-results');
+  resultsContainer.classList.remove('empty');
+  resultsContainer.textContent = 'Проверка выполняется...';
+  try {
+    const payload = await api('/cgi-bin/blockcheck-custom.cgi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ target, profile }),
+    });
+    renderBlockcheckResults(payload.results);
+    renderBlockcheckRecommendation(payload.recommendation);
+    showBanner('Кастомная проверка завершена.');
+    await refreshAll();
+  } catch (error) {
+    showBanner(error.message, 'error');
+  }
+});
+
+document.getElementById('apply-blockcheck').addEventListener('click', async () => {
+  try {
+    await api('/cgi-bin/blockcheck-apply.cgi', { method: 'POST' });
+    showBanner('Рекомендация применена.');
+    await refreshAll();
   } catch (error) {
     showBanner(error.message, 'error');
   }
