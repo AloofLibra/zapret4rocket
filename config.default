@@ -294,18 +294,6 @@ NFQWS2_OPT="
 
 --new
 
-# Profile 6: MTProto/Telegram (TCP 443, 5222)
-
---filter-l7=mtproto
---filter-tcp=443,5222
---in-range=-d1000
---out-range=-d1000
---lua-desync=circular_locked:key=7:allow_nohost=1
---payload=mtproto_initial
---lua-desync=fakedsplit:pos=1:strategy=1
-
---new
-
 # Я не помню для чего это было так что скип =)
 --skip --filter-udp=1026-65531
 --blob=fake_quic_unknown_udp:/opt/zapret2/files/fake/quic_initial_www_google_com.bin
