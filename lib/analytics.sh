@@ -472,9 +472,9 @@ analytics_run_report() {
         run)
             analytics_progress_write "blockcheck" "Running fresh blockcheck scan" "$target" "$profile_id" "$profile_name"
             if [ -n "$target" ]; then
-                blockcheck_run_custom_scan "$target" "$profile_id" || return 1
+                blockcheck_run_custom_scan "$target" "$profile_id" >/dev/null || return 1
             else
-                blockcheck_run_profile_scan "$profile_id" || return 1
+                blockcheck_run_profile_scan "$profile_id" >/dev/null || return 1
             fi
             recommendation_json="$(blockcheck_last_context_json)"
             run_file="$(printf '%s\n' "$recommendation_json" | sed -n -E 's/.*"run_file":"([^"]*)".*/\1/p' | head -n1)"
@@ -492,7 +492,7 @@ analytics_run_report() {
                 source_type="blockcheck_last"
             else
                 analytics_progress_write "blockcheck" "Running blockcheck for target" "$normalized_target" "$profile_id" "$profile_name"
-                blockcheck_run_custom_scan "$normalized_target" "$profile_id" || return 1
+                blockcheck_run_custom_scan "$normalized_target" "$profile_id" >/dev/null || return 1
                 recommendation_json="$(blockcheck_last_context_json)"
                 run_file="$(printf '%s\n' "$recommendation_json" | sed -n -E 's/.*"run_file":"([^"]*)".*/\1/p' | head -n1)"
                 recommendation_file="$BLOCKCHECK_LAST_RECOMMENDATION_FILE"
