@@ -6,6 +6,7 @@ WEBUI_ROOT="/opt/zapret2/webui"
 WEBUI_CGI="$WEBUI_ROOT/cgi-bin"
 ZAPRET_ROOT="/opt/zapret2"
 BLOCKCHECK_JOBS_DIR="/opt/zapret2/extra_strats/cache/blockcheck2/jobs"
+ANALYTICS_JOBS_DIR="/opt/zapret2/extra_strats/cache/analytics/jobs"
 CONFIG_FILE="$ZAPRET_ROOT/config"
 CONFIG_DEFAULT_FILE="$ZAPRET_ROOT/config.default"
 ORCH_DIR="$ZAPRET_ROOT/extra_strats/cache/orchestra"
@@ -48,6 +49,8 @@ parse_params() {
       strategy) PARAM_STRATEGY="$value" ;;
       target) PARAM_TARGET="$value" ;;
       job) PARAM_JOB="$value" ;;
+      mode) PARAM_MODE="$value" ;;
+      use_last_blockcheck) PARAM_USE_LAST_BLOCKCHECK="$value" ;;
     esac
   done
 }
@@ -232,7 +235,7 @@ orch_max_strategy_for_profile() {
 
 profile_proto() {
   case "$1" in
-    1|2|3|4|7) echo "tls" ;;
+    1|2|3|4) echo "tls" ;;
     5|6) echo "udp" ;;
     *) echo "" ;;
   esac
@@ -261,7 +264,6 @@ all_profiles_json() {
   printf ','
   profile_json 6 "Voice UDP" "Discord/STUN и голосовые сервисы"
   printf ','
-  profile_json 7 "Telegram" "MTProto/Telegram"
   printf ']'
 }
 
@@ -374,6 +376,9 @@ $(check_one_target_json "YouTube" "https://www.youtube.com/")
 if [ -f "$ZAPRET_ROOT/z2r_lib/blockcheck.sh" ]; then
   . "$ZAPRET_ROOT/z2r_lib/blockcheck.sh"
 fi
+if [ -f "$ZAPRET_ROOT/z2r_lib/analytics.sh" ]; then
+  . "$ZAPRET_ROOT/z2r_lib/analytics.sh"
+fi
 
 blockcheck_rows_json() {
   local file="$1"
@@ -466,6 +471,72 @@ api_blockcheck_job() {
   [ -n "${PARAM_JOB:-}" ] || send_error "400 Bad Request" "Не указан job id"
   local file
   file="$(blockcheck_job_file "$PARAM_JOB")"
+  [ -f "$file" ] || send_error "404 Not Found" "Job не найден"
+  send_json "200 OK" "$(cat "$file")"
+}
+
+analytics_job_file() {
+  printf '%s/%s.json' "$ANALYTICS_JOBS_DIR" "$1"
+}
+
+analytics_job_create() {
+  mkdir -p "$ANALYTICS_JOBS_DIR"
+  printf 'an_%s_%s' "$(date +%Y%m%d%H%M%S)" "$$"
+}
+
+analytics_job_write_running() {
+  local job_id="$1"
+  mkdir -p "$ANALYTICS_JOBS_DIR"
+  cat > "$(analytics_job_file "$job_id")" <<EOF
+{"job_id":"$job_id","status":"running"}
+EOF
+}
+
+api_analytics_meta() {
+  type analytics_last_json >/dev/null 2>&1 || send_error "500 Internal Server Error" "Модуль аналитики недоступен"
+  send_json "200 OK" "{\"profiles\":$(all_profiles_json),\"modes\":[\"last\",\"run\",\"target\"],\"dns_policy\":{\"system\":true,\"resolvers\":[\"1.1.1.1\",\"8.8.8.8\"],\"fallback\":\"doh\"}}"
+}
+
+api_analytics_last() {
+  type analytics_last_json >/dev/null 2>&1 || send_error "500 Internal Server Error" "Модуль аналитики недоступен"
+  send_json "200 OK" "$(analytics_last_json)"
+}
+
+api_analytics_start() {
+  parse_params
+  type analytics_run_report >/dev/null 2>&1 || send_error "500 Internal Server Error" "Модуль аналитики недоступен"
+
+  local mode profile target use_last job_id
+  mode="${PARAM_MODE:-last}"
+  profile="${PARAM_PROFILE:-3}"
+  target="${PARAM_TARGET:-}"
+  use_last="${PARAM_USE_LAST_BLOCKCHECK:-0}"
+
+  case "$mode" in
+    last) ;;
+    run)
+      [[ "$profile" =~ ^[1-7]$ ]] || send_error "400 Bad Request" "Некорректный профиль"
+      ;;
+    target)
+      [ -n "$target" ] || send_error "400 Bad Request" "Пустая цель проверки"
+      [[ "$profile" =~ ^[1-7]$ ]] || send_error "400 Bad Request" "Некорректный профиль"
+      ;;
+    *)
+      send_error "400 Bad Request" "Неизвестный режим аналитики"
+      ;;
+  esac
+
+  job_id="$(analytics_job_create)"
+  analytics_job_write_running "$job_id"
+  nohup "$WEBUI_CGI/analytics-worker.sh" "$job_id" "$mode" "$profile" "$target" "$use_last" >/dev/null 2>&1 &
+  send_json "200 OK" "{\"job_id\":\"$job_id\",\"status\":\"running\"}"
+}
+
+api_analytics_job() {
+  parse_params
+  [ -n "${PARAM_JOB:-}" ] || send_error "400 Bad Request" "Не указан job id"
+  local file
+  file="$(analytics_job_file "$PARAM_JOB")"
   [ -f "$file" ] || send_error "404 Not Found" "Job не найден"
   send_json "200 OK" "$(cat "$file")"
 }

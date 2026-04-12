@@ -88,6 +88,7 @@ main() {
   install_one "z2r.sh" "$ZROOT/z2r.sh"
   install_one "lib/submenus.sh" "$LIB_DIR/submenus.sh"
   install_one "lib/blockcheck.sh" "$LIB_DIR/blockcheck.sh"
+  install_one "lib/analytics.sh" "$LIB_DIR/analytics.sh"
 
   install_one "webui/index.html" "$WEBUI_WWW/index.html"
   install_one "webui/app.js" "$WEBUI_WWW/app.js"
@@ -111,8 +112,14 @@ main() {
   install_one "webui/cgi-bin/blockcheck-profile-start.cgi" "$WEBUI_CGI/blockcheck-profile-start.cgi"
   install_one "webui/cgi-bin/blockcheck-custom-start.cgi" "$WEBUI_CGI/blockcheck-custom-start.cgi"
   install_one "webui/cgi-bin/blockcheck-job.cgi" "$WEBUI_CGI/blockcheck-job.cgi"
+  install_one "webui/cgi-bin/analytics-meta.cgi" "$WEBUI_CGI/analytics-meta.cgi"
+  install_one "webui/cgi-bin/analytics-last.cgi" "$WEBUI_CGI/analytics-last.cgi"
+  install_one "webui/cgi-bin/analytics-start.cgi" "$WEBUI_CGI/analytics-start.cgi"
+  install_one "webui/cgi-bin/analytics-job.cgi" "$WEBUI_CGI/analytics-job.cgi"
+  install_one "webui/cgi-bin/analytics-worker.sh" "$WEBUI_CGI/analytics-worker.sh"
 
   mkdir -p "$ZROOT/extra_strats/cache/blockcheck2/history"
+  mkdir -p "$ZROOT/extra_strats/cache/analytics/history"
 
   restart_webui_if_present
 

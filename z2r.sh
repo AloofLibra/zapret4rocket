@@ -1050,6 +1050,28 @@ webui_repo_fetch() {
   return 1
 }
 
+repo_fetch_any() {
+  local rel="$1"
+  local dest="$2"
+  local local_src="$SCRIPT_DIR/$rel"
+  local remote_url="https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/$rel"
+
+  mkdir -p "$(dirname "$dest")"
+  if [ -f "$local_src" ]; then
+    cp -f "$local_src" "$dest"
+    return 0
+  fi
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL -o "$dest" "$remote_url"
+    return $?
+  fi
+  if command -v wget >/dev/null 2>&1; then
+    wget -qO "$dest" "$remote_url"
+    return $?
+  fi
+  return 1
+}
+
 webui_has_busybox_httpd() {
   if ! command -v busybox >/dev/null 2>&1; then
     return 1
@@ -1098,6 +1120,7 @@ webui_install_files() {
   webui_repo_fetch "index.html" "$WEBUI_WWW/index.html" || return 1
   webui_repo_fetch "styles.css" "$WEBUI_WWW/styles.css" || return 1
   webui_repo_fetch "app.js" "$WEBUI_WWW/app.js" || return 1
+  repo_fetch_any "lib/analytics.sh" "$ZROOT/z2r_lib/analytics.sh" || return 1
   webui_repo_fetch "run-webui.sh" "$WEBUI_RUNNER" || return 1
   webui_repo_fetch "cgi-bin/_lib.sh" "$WEBUI_CGI/_lib.sh" || return 1
   webui_repo_fetch "cgi-bin/status.cgi" "$WEBUI_CGI/status.cgi" || return 1
@@ -1116,6 +1139,11 @@ webui_install_files() {
   webui_repo_fetch "cgi-bin/blockcheck-profile-start.cgi" "$WEBUI_CGI/blockcheck-profile-start.cgi" || return 1
   webui_repo_fetch "cgi-bin/blockcheck-custom-start.cgi" "$WEBUI_CGI/blockcheck-custom-start.cgi" || return 1
   webui_repo_fetch "cgi-bin/blockcheck-job.cgi" "$WEBUI_CGI/blockcheck-job.cgi" || return 1
+  webui_repo_fetch "cgi-bin/analytics-meta.cgi" "$WEBUI_CGI/analytics-meta.cgi" || return 1
+  webui_repo_fetch "cgi-bin/analytics-last.cgi" "$WEBUI_CGI/analytics-last.cgi" || return 1
+  webui_repo_fetch "cgi-bin/analytics-start.cgi" "$WEBUI_CGI/analytics-start.cgi" || return 1
+  webui_repo_fetch "cgi-bin/analytics-job.cgi" "$WEBUI_CGI/analytics-job.cgi" || return 1
+  webui_repo_fetch "cgi-bin/analytics-worker.sh" "$WEBUI_CGI/analytics-worker.sh" || return 1
 
   chmod +x "$WEBUI_RUNNER" "$WEBUI_CGI"/*.sh "$WEBUI_CGI"/*.cgi
   ln -sfn ../cgi-bin "$WEBUI_WWW/cgi-bin"

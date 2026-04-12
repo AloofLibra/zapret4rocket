@@ -18,6 +18,7 @@
         <button class="tab is-active" data-view="status">Статус</button>
         <button class="tab" data-view="strategies">Стратегии</button>
         <button class="tab" data-view="blockcheck">Blockcheck</button>
+        <button class="tab" data-view="analytics">Analytics</button>
       </nav>
     </header>
 
@@ -108,6 +109,48 @@
           <h2>Результаты последней проверки</h2>
         </div>
         <div id="blockcheck-results" class="checks empty">Запустите проверку профиля или домена.</div>
+      </section>
+    </section>
+
+    <section class="view" id="view-analytics">
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Анализ последнего blockcheck</h2>
+        </div>
+        <div class="card-actions">
+          <button id="analytics-last-run" class="primary">Собрать отчёт по последнему blockcheck</button>
+          <button id="analytics-refresh" class="ghost">Обновить последний отчёт</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Полная аналитика по запросу</h2>
+        </div>
+        <form id="analytics-form" class="stack">
+          <label>
+            <span>Домен или URL</span>
+            <input id="analytics-target" type="text" placeholder="https://example.com или example.com">
+          </label>
+          <label>
+            <span>Профиль</span>
+            <select id="analytics-profile-select"></select>
+          </label>
+          <div class="card-actions">
+            <button type="submit" class="primary">Запустить полный анализ</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Последний отчёт</h2>
+        </div>
+        <div id="analytics-summary" class="checks empty">Отчёт ещё не сформирован.</div>
+        <div id="analytics-dns" class="checks empty">DNS-диагностика будет показана здесь.</div>
+        <div id="analytics-transport" class="checks empty">Transport/TLS-диагностика будет показана здесь.</div>
+        <div id="analytics-blockcheck" class="checks empty">Связь со стратегиями будет показана здесь.</div>
+        <div id="analytics-hints" class="checks empty">Подсказки по стратегии будут показаны здесь.</div>
       </section>
     </section>
   </main>

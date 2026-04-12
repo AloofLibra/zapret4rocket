@@ -4,12 +4,16 @@ const state = {
   blockcheckMeta: null,
   lastRecommendation: null,
   blockcheckJobId: null,
+  analyticsMeta: null,
+  analyticsJobId: null,
+  lastAnalytics: null,
 };
 
 const views = {
   status: document.getElementById('view-status'),
   strategies: document.getElementById('view-strategies'),
   blockcheck: document.getElementById('view-blockcheck'),
+  analytics: document.getElementById('view-analytics'),
 };
 
 function showBanner(message, type = 'success') {
@@ -54,6 +58,23 @@ async function waitForBlockcheckJob(jobId) {
   }
 }
 
+async function waitForAnalyticsJob(jobId) {
+  state.analyticsJobId = jobId;
+  for (;;) {
+    const payload = await api(`/cgi-bin/analytics-job.cgi?job=${encodeURIComponent(jobId)}`);
+    if (payload.status === 'completed') {
+      state.analyticsJobId = null;
+      return payload;
+    }
+    if (payload.status === 'error') {
+      state.analyticsJobId = null;
+      throw new Error(payload.error || 'Analytics job failed');
+    }
+    renderAnalyticsProgress(payload);
+    await new Promise((resolve) => window.setTimeout(resolve, 1500));
+  }
+}
+
 function renderBlockcheckProgress(payload) {
   const container = document.getElementById('blockcheck-results');
   const current = payload.current || 0;
@@ -70,6 +91,20 @@ function renderBlockcheckProgress(payload) {
       <span>Стратегия: ${strategy}</span>
       <span>Последний результат: ${payload.last_result || '-'}</span>
       <span>${payload.last_reason || ''}</span>
+    </article>
+  `;
+}
+
+function renderAnalyticsProgress(payload) {
+  const container = document.getElementById('analytics-summary');
+  container.classList.remove('empty');
+  container.innerHTML = `
+    <article class="check-item recommendation">
+      <strong>Аналитический отчёт формируется</strong>
+      <span>Профиль: ${payload.profile_name || payload.profile_id || '-'}</span>
+      <span>Цель: ${payload.target || '-'}</span>
+      <span>Этап: ${payload.phase || 'running'}</span>
+      <span>${payload.status_text || ''}</span>
     </article>
   `;
 }
@@ -217,6 +252,18 @@ function populateBlockcheckForms() {
   });
 }
 
+function populateAnalyticsForms() {
+  if (!state.analyticsMeta) return;
+  const select = document.getElementById('analytics-profile-select');
+  select.innerHTML = '';
+  state.analyticsMeta.profiles.forEach((profile) => {
+    const option = document.createElement('option');
+    option.value = String(profile.profile);
+    option.textContent = `${profile.profile}. ${profile.label}`;
+    select.appendChild(option);
+  });
+}
+
 function renderBlockcheckRecommendation(recommendation) {
   const container = document.getElementById('blockcheck-recommendation');
   state.lastRecommendation = recommendation;
@@ -274,20 +321,162 @@ function renderBlockcheckResults(results) {
   });
 }
 
+function renderAnalyticsReport(report) {
+  state.lastAnalytics = report;
+  const summary = document.getElementById('analytics-summary');
+  const dns = document.getElementById('analytics-dns');
+  const transport = document.getElementById('analytics-transport');
+  const blockcheck = document.getElementById('analytics-blockcheck');
+  const hints = document.getElementById('analytics-hints');
+
+  if (!report || !report.run_id) {
+    summary.className = 'checks empty';
+    dns.className = 'checks empty';
+    transport.className = 'checks empty';
+    blockcheck.className = 'checks empty';
+    hints.className = 'checks empty';
+    summary.textContent = 'Отчёт ещё не сформирован.';
+    dns.textContent = 'DNS-диагностика будет показана здесь.';
+    transport.textContent = 'Transport/TLS-диагностика будет показана здесь.';
+    blockcheck.textContent = 'Связь со стратегиями будет показана здесь.';
+    hints.textContent = 'Подсказки по стратегии будут показаны здесь.';
+    return;
+  }
+
+  const summaryLabelMap = {
+    dns_suspect: 'DNS issue',
+    dns_mismatch: 'DNS issue',
+    no_dns_answer: 'DNS issue',
+    transport_blocked: 'Transport issue',
+    tls_partial: 'Transport issue',
+    likely_block_page: 'Block page',
+    likely_redirect_or_stub: 'Block page',
+    strategy_sensitive: 'Strategy-sensitive',
+    unclear: 'Unclear',
+  };
+
+  summary.className = 'checks';
+  summary.innerHTML = `
+    <article class="check-item recommendation">
+      <div class="check-title">
+        <strong>${report.target}</strong>
+        <span class="chip">${summaryLabelMap[report.summary?.blocking_class] || 'Unclear'}</span>
+      </div>
+      <span>Профиль: ${report.profile_name || report.profile_id || '-'}</span>
+      <span>Время: ${report.created_at || '-'}</span>
+      <span>${report.summary?.short_text || ''}</span>
+      <span>${report.summary?.recommendation_note || ''}</span>
+    </article>
+  `;
+
+  const comparisonCards = (report.dns?.comparisons || []).map((item) => `
+    <article class="check-item">
+      <div class="check-title">
+        <strong>${item.name}</strong>
+        <span>${item.method}</span>
+      </div>
+      <div class="check-pair">
+        <span>${(item.ips || []).join(', ') || 'нет ответа'}</span>
+      </div>
+      <div class="check-pair">
+        <span>${item.status_text || ''}</span>
+      </div>
+    </article>
+  `).join('');
+
+  dns.className = 'checks';
+  dns.innerHTML = `
+    <article class="check-item recommendation">
+      <strong>DNS</strong>
+      <span>Hostname: ${report.dns?.hostname || '-'}</span>
+      <span>${report.dns?.summary || ''}</span>
+      <span>System DNS: ${(report.dns?.system?.ips || []).join(', ') || 'нет ответа'}</span>
+      <span>Флаги: ${(report.dns?.suspicious_flags || []).join(', ') || 'нет'}</span>
+    </article>
+    ${comparisonCards || '<article class="check-item">Нет данных сравнения.</article>'}
+  `;
+
+  const transportRows = ['plain', 'tls12', 'tls13'].map((key) => {
+    const item = report.transport?.[key] || {};
+    return `
+      <article class="check-item">
+        <div class="check-title">
+          <strong>${key.toUpperCase()}</strong>
+          <span class="${item.verdict === 'ok' ? 'ok' : 'bad'}">${item.verdict || 'unknown'}</span>
+        </div>
+        <div class="check-pair">
+          <span>HTTP: ${item.http_code || '-'}</span>
+          <span>${item.error_class || 'no error class'}</span>
+        </div>
+        <div class="check-pair">
+          <span>${item.redirect_url || ''}</span>
+        </div>
+        <div class="check-pair">
+          <span>${item.snippet || ''}</span>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  transport.className = 'checks';
+  transport.innerHTML = `
+    <article class="check-item recommendation">
+      <strong>Transport / TLS</strong>
+      <span>${report.transport?.summary || ''}</span>
+    </article>
+    ${transportRows}
+  `;
+
+  const resultCards = (report.blockcheck?.results || []).map((item) => `
+    <article class="check-item">
+      <div class="check-title">
+        <strong>Стратегия ${item.strategy}</strong>
+        <span class="${item.result === 'ok' ? 'ok' : item.result === 'unstable' ? 'ok' : 'bad'}">${item.result}</span>
+      </div>
+      <div class="check-pair">
+        <span>${item.reason || ''}</span>
+        <span>${item.elapsed_ms || 0} ms</span>
+      </div>
+    </article>
+  `).join('');
+
+  blockcheck.className = 'checks';
+  blockcheck.innerHTML = `
+    <article class="check-item recommendation">
+      <strong>Blockcheck / стратегии</strong>
+      <span>Лучшая: ${report.blockcheck?.best_strategy ?? 'нет'}</span>
+      <span>Запасные: ${(report.blockcheck?.backup_strategies || []).join(', ') || 'нет'}</span>
+      <span>Неудачные: ${(report.blockcheck?.failed_strategies || []).join(', ') || 'нет'}</span>
+      <span>Стабильных: ${report.blockcheck?.stable_count || 0}, нестабильных: ${report.blockcheck?.unstable_count || 0}, fail: ${report.blockcheck?.fail_count || 0}</span>
+    </article>
+    ${resultCards || '<article class="check-item">Детали blockcheck отсутствуют.</article>'}
+  `;
+
+  hints.className = 'checks';
+  hints.innerHTML = (report.hints || []).length
+    ? (report.hints || []).map((hint) => `<article class="check-item"><strong>Подсказка</strong><span>${hint}</span></article>`).join('')
+    : '<article class="check-item">Подсказок пока нет.</article>';
+}
+
 async function refreshAll() {
-  const [status, locks, blockcheckMeta, lastRecommendation] = await Promise.all([
+  const [status, locks, blockcheckMeta, lastRecommendation, analyticsMeta, analyticsLast] = await Promise.all([
     api('/cgi-bin/status.cgi'),
     api('/cgi-bin/locks.cgi'),
     api('/cgi-bin/blockcheck-meta.cgi'),
     api('/cgi-bin/blockcheck-last.cgi'),
+    api('/cgi-bin/analytics-meta.cgi'),
+    api('/cgi-bin/analytics-last.cgi'),
   ]);
   state.status = status;
   state.locks = locks.profiles;
   state.blockcheckMeta = blockcheckMeta;
+  state.analyticsMeta = analyticsMeta;
   renderStatus();
   renderStrategies();
   populateBlockcheckForms();
+  populateAnalyticsForms();
   renderBlockcheckRecommendation(lastRecommendation);
+  renderAnalyticsReport(analyticsLast);
 }
 
 document.querySelectorAll('.tab').forEach((tab) => {
@@ -379,6 +568,53 @@ document.getElementById('apply-blockcheck').addEventListener('click', async () =
   try {
     await api('/cgi-bin/blockcheck-apply.cgi', { method: 'POST' });
     showBanner('Рекомендация применена.');
+    await refreshAll();
+  } catch (error) {
+    showBanner(error.message, 'error');
+  }
+});
+
+document.getElementById('analytics-refresh').addEventListener('click', async () => {
+  try {
+    const payload = await api('/cgi-bin/analytics-last.cgi');
+    renderAnalyticsReport(payload);
+  } catch (error) {
+    showBanner(error.message, 'error');
+  }
+});
+
+document.getElementById('analytics-last-run').addEventListener('click', async () => {
+  try {
+    const started = await api('/cgi-bin/analytics-start.cgi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ mode: 'last' }),
+    });
+    const payload = await waitForAnalyticsJob(started.job_id);
+    renderAnalyticsReport(payload.report);
+    showBanner('Аналитический отчёт по последнему blockcheck готов.');
+  } catch (error) {
+    showBanner(error.message, 'error');
+  }
+});
+
+document.getElementById('analytics-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const target = document.getElementById('analytics-target').value.trim();
+  const profile = document.getElementById('analytics-profile-select').value;
+  if (!target) {
+    showBanner('Введите домен или URL для анализа.', 'error');
+    return;
+  }
+  try {
+    const started = await api('/cgi-bin/analytics-start.cgi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ mode: 'target', target, profile }),
+    });
+    const payload = await waitForAnalyticsJob(started.job_id);
+    renderAnalyticsReport(payload.report);
+    showBanner('Полный аналитический отчёт готов.');
     await refreshAll();
   } catch (error) {
     showBanner(error.message, 'error');

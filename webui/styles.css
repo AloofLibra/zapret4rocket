@@ -236,6 +236,10 @@ select {
   gap: 10px;
 }
 
+#analytics-summary .chip {
+  align-self: flex-start;
+}
+
 .checks.empty {
   font-style: italic;
 }
@@ -264,6 +268,10 @@ select {
   gap: 10px;
   flex-wrap: wrap;
   font-size: 14px;
+}
+
+#view-analytics {
+  align-items: start;
 }
 
 .ok {

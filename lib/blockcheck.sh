@@ -3,6 +3,19 @@ BLOCKCHECK_RESULTS_FILE="$BLOCKCHECK_DIR/results.tsv"
 BLOCKCHECK_LAST_RECOMMENDATION_FILE="$BLOCKCHECK_DIR/last_recommendations.json"
 BLOCKCHECK_HISTORY_DIR="$BLOCKCHECK_DIR/history"
 
+blockcheck_count_results() {
+    local run_file="$1"
+    [ -f "$run_file" ] || {
+        printf '0\t0\t0\t0\n'
+        return
+    }
+    printf '%s\t%s\t%s\t%s\n' \
+        "$(awk -F '\t' 'NF >= 12 {count++} END {print count+0}' "$run_file")" \
+        "$(awk -F '\t' '$7=="ok" {count++} END {print count+0}' "$run_file")" \
+        "$(awk -F '\t' '$7=="unstable" {count++} END {print count+0}' "$run_file")" \
+        "$(awk -F '\t' '$7=="fail" {count++} END {print count+0}' "$run_file")"
+}
+
 blockcheck_progress_write() {
     [ -n "${BLOCKCHECK_PROGRESS_FILE:-}" ] || return 0
     local phase="$1"
@@ -38,7 +51,6 @@ blockcheck_profile_name() {
         4) echo "Discord TCP" ;;
         5) echo "YouTube QUIC" ;;
         6) echo "Voice UDP" ;;
-        7) echo "Telegram" ;;
         *) echo "Unknown" ;;
     esac
 }
@@ -51,14 +63,13 @@ blockcheck_profile_target() {
         4) echo "https://discord.com/" ;;
         5) echo "" ;;
         6) echo "" ;;
-        7) echo "https://telegram.org/" ;;
         *) echo "" ;;
     esac
 }
 
 blockcheck_profile_proto() {
     case "$1" in
-        1|2|3|4|7) echo "tls" ;;
+        1|2|3|4) echo "tls" ;;
         5|6) echo "udp" ;;
         *) echo "" ;;
     esac
@@ -66,7 +77,7 @@ blockcheck_profile_proto() {
 
 blockcheck_profile_supported() {
     case "$1" in
-        1|2|3|4|7) return 0 ;;
+        1|2|3|4) return 0 ;;
         5|6) return 1 ;;
         *) return 1 ;;
     esac
@@ -188,10 +199,15 @@ blockcheck_write_last_recommendation() {
     local summary="$9"
     local run_file="${10}"
     local summary_file="${11}"
+    local created_at="${12:-}"
+    local total_count="${13:-0}"
+    local stable_count="${14:-0}"
+    local unstable_count="${15:-0}"
+    local fail_count="${16:-0}"
 
     blockcheck_init_dirs
     cat > "$BLOCKCHECK_LAST_RECOMMENDATION_FILE" <<EOF
-{"mode":"$(blockcheck_json_escape "$mode")","profile_id":"$(blockcheck_json_escape "$profile_id")","profile_name":"$(blockcheck_json_escape "$profile_name")","target":"$(blockcheck_json_escape "$target")","supported":$supported,"best_strategy":${best:-null},"backup_strategies":$(blockcheck_json_array_from_csv "$backups_csv"),"failed_strategies":$(blockcheck_json_array_from_csv "$failed_csv"),"reason_summary":"$(blockcheck_json_escape "$summary")","run_file":"$(blockcheck_json_escape "$run_file")","summary_file":"$(blockcheck_json_escape "$summary_file")"}
+{"mode":"$(blockcheck_json_escape "$mode")","profile_id":"$(blockcheck_json_escape "$profile_id")","profile_name":"$(blockcheck_json_escape "$profile_name")","target":"$(blockcheck_json_escape "$target")","supported":$supported,"best_strategy":${best:-null},"backup_strategies":$(blockcheck_json_array_from_csv "$backups_csv"),"failed_strategies":$(blockcheck_json_array_from_csv "$failed_csv"),"reason_summary":"$(blockcheck_json_escape "$summary")","run_file":"$(blockcheck_json_escape "$run_file")","summary_file":"$(blockcheck_json_escape "$summary_file")","created_at":"$(blockcheck_json_escape "$created_at")","results_count":${total_count:-0},"stable_count":${stable_count:-0},"unstable_count":${unstable_count:-0},"fail_count":${fail_count:-0}}
 EOF
 }
 
@@ -204,7 +220,13 @@ blockcheck_compute_recommendation() {
     local current_lock="$6"
     local summary_file="$7"
     local best="" backups_csv="" failed_csv="" summary="" supported=true
+    local created_at total_count stable_count unstable_count fail_count
     local ranking_file="${run_file}.ranking"
+
+    created_at="$(date '+%Y-%m-%d %H:%M:%S')"
+    IFS=$'\t' read -r total_count stable_count unstable_count fail_count <<EOF
+$(blockcheck_count_results "$run_file")
+EOF
 
     : > "$ranking_file"
 
@@ -263,7 +285,7 @@ blockcheck_compute_recommendation() {
         echo "Reason: $summary"
     } > "$summary_file"
 
-    blockcheck_write_last_recommendation "$mode" "$profile_id" "$profile_name" "$target" "$supported" "${best:-null}" "$backups_csv" "$failed_csv" "$summary" "$run_file" "$summary_file"
+    blockcheck_write_last_recommendation "$mode" "$profile_id" "$profile_name" "$target" "$supported" "${best:-null}" "$backups_csv" "$failed_csv" "$summary" "$run_file" "$summary_file" "$created_at" "$total_count" "$stable_count" "$unstable_count" "$fail_count"
     rm -f "$ranking_file"
 }
 
@@ -285,7 +307,15 @@ blockcheck_write_unsupported_recommendation() {
         echo "Reason: $summary"
     } > "$summary_file"
 
-    blockcheck_write_last_recommendation "$mode" "$profile_id" "$profile_name" "$target" false null "" "" "$summary" "$run_file" "$summary_file"
+    blockcheck_write_last_recommendation "$mode" "$profile_id" "$profile_name" "$target" false null "" "" "$summary" "$run_file" "$summary_file" "$(date '+%Y-%m-%d %H:%M:%S')" 0 0 0 0
+}
+
+blockcheck_last_context_json() {
+    if [ -s "$BLOCKCHECK_LAST_RECOMMENDATION_FILE" ]; then
+        cat "$BLOCKCHECK_LAST_RECOMMENDATION_FILE"
+    else
+        echo '{"mode":"","profile_id":"","profile_name":"","target":"","supported":false,"best_strategy":null,"backup_strategies":[],"failed_strategies":[],"reason_summary":"","run_file":"","summary_file":"","created_at":"","results_count":0,"stable_count":0,"unstable_count":0,"fail_count":0}'
+    fi
 }
 
 blockcheck_run_scan() {
