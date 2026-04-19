@@ -1057,6 +1057,14 @@ webui_server_type() {
     echo "uhttpd"
     return
   fi
+  if command -v uhttpd_kn >/dev/null 2>&1; then
+    echo "uhttpd_kn"
+    return
+  fi
+  if command -v httpd >/dev/null 2>&1; then
+    echo "httpd"
+    return
+  fi
   if webui_has_busybox_httpd; then
     echo "busybox"
     return
@@ -1070,7 +1078,11 @@ webui_ensure_server_binary() {
   fi
 
   if command -v opkg >/dev/null 2>&1; then
-    opkg install uhttpd 2>/dev/null || opkg install busybox 2>/dev/null || true
+    opkg install uhttpd 2>/dev/null || true
+    [ "$(webui_server_type)" != "none" ] || opkg install uhttpd_kn 2>/dev/null || true
+    [ "$(webui_server_type)" != "none" ] || opkg install uhttpd-kn 2>/dev/null || true
+    [ "$(webui_server_type)" != "none" ] || opkg install busybox-httpd 2>/dev/null || true
+    [ "$(webui_server_type)" != "none" ] || opkg install busybox 2>/dev/null || true
   elif command -v apk >/dev/null 2>&1; then
     apk add uhttpd busybox 2>/dev/null || apk add busybox 2>/dev/null || true
   elif command -v apt-get >/dev/null 2>&1; then

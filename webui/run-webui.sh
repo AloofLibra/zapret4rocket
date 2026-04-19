@@ -26,11 +26,26 @@ detect_server() {
     echo "uhttpd"
     return
   fi
+  if command -v uhttpd_kn >/dev/null 2>&1; then
+    echo "uhttpd_kn"
+    return
+  fi
+  if command -v httpd >/dev/null 2>&1; then
+    echo "httpd"
+    return
+  fi
   if has_busybox_httpd; then
     echo "busybox"
     return
   fi
   echo "none"
+}
+
+available_servers() {
+  command -v uhttpd >/dev/null 2>&1 && echo "uhttpd"
+  command -v uhttpd_kn >/dev/null 2>&1 && echo "uhttpd_kn"
+  command -v httpd >/dev/null 2>&1 && echo "httpd"
+  has_busybox_httpd && echo "busybox"
 }
 
 is_running() {
@@ -55,11 +70,13 @@ has_port_listener() {
 
 has_matching_process() {
   if command -v pgrep >/dev/null 2>&1; then
+    pgrep -f "uhttpd_kn.*${WEBUI_WWW}" >/dev/null 2>&1 && return 0
     pgrep -f "uhttpd.*${WEBUI_WWW}" >/dev/null 2>&1 && return 0
+    pgrep -f "httpd.*${WEBUI_WWW}" >/dev/null 2>&1 && return 0
     pgrep -f "busybox httpd.*${WEBUI_WWW}" >/dev/null 2>&1 && return 0
   fi
   if command -v ps >/dev/null 2>&1; then
-    ps w 2>/dev/null | grep -F "$WEBUI_WWW" | grep -E "uhttpd|busybox httpd" | grep -v grep >/dev/null 2>&1 && return 0
+    ps w 2>/dev/null | grep -F "$WEBUI_WWW" | grep -E "uhttpd_kn|uhttpd|(^|[[:space:]])httpd|busybox httpd" | grep -v grep >/dev/null 2>&1 && return 0
   fi
   return 1
 }
@@ -71,12 +88,17 @@ is_running_any() {
   return 1
 }
 
-run_server() {
-  local server
-  server="$(detect_server)"
+run_server_once() {
+  local server="$1"
   case "$server" in
+    uhttpd_kn)
+      exec uhttpd_kn -f -p "0.0.0.0:${PORT}" -h "$WEBUI_WWW" -x /cgi-bin
+      ;;
     uhttpd)
       exec uhttpd -f -p "0.0.0.0:${PORT}" -h "$WEBUI_WWW" -x /cgi-bin
+      ;;
+    httpd)
+      exec httpd -f -p "0.0.0.0:${PORT}" -h "$WEBUI_WWW"
       ;;
     busybox)
       exec busybox httpd -f -p "0.0.0.0:${PORT}" -h "$WEBUI_WWW"
@@ -86,6 +108,21 @@ run_server() {
       exit 1
       ;;
   esac
+}
+
+run_server() {
+  local server tried_any=0
+  for server in $(available_servers); do
+    tried_any=1
+    echo "Trying web server: $server" >&2
+    run_server_once "$server"
+  done
+  if [ "$tried_any" -eq 0 ]; then
+    echo "No supported web server found" >&2
+  else
+    echo "Failed to start any supported web server" >&2
+  fi
+  exit 1
 }
 
 start_server() {
@@ -113,7 +150,9 @@ stop_server() {
     fi
   fi
   if command -v pgrep >/dev/null 2>&1; then
+    pgrep -f "uhttpd_kn.*${WEBUI_WWW}" >/dev/null 2>&1 && pkill -f "uhttpd_kn.*${WEBUI_WWW}" 2>/dev/null || true
     pgrep -f "uhttpd.*${WEBUI_WWW}" >/dev/null 2>&1 && pkill -f "uhttpd.*${WEBUI_WWW}" 2>/dev/null || true
+    pgrep -f "httpd.*${WEBUI_WWW}" >/dev/null 2>&1 && pkill -f "httpd.*${WEBUI_WWW}" 2>/dev/null || true
     pgrep -f "busybox httpd.*${WEBUI_WWW}" >/dev/null 2>&1 && pkill -f "busybox httpd.*${WEBUI_WWW}" 2>/dev/null || true
   fi
   rm -f "$PID_FILE"
