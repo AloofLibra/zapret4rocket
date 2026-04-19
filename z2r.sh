@@ -1021,6 +1021,7 @@ WEBUI_WWW="$WEBUI_ROOT/www"
 WEBUI_CGI="$WEBUI_ROOT/cgi-bin"
 WEBUI_RUNNER="$WEBUI_ROOT/run-webui.sh"
 WEBUI_STATUS_CACHE="/opt/zapret2/extra_strats/cache/webui"
+WEBUI_PATH="/opt/bin:/opt/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 webui_repo_fetch() {
   local rel="$1"
@@ -1046,22 +1047,22 @@ webui_repo_fetch() {
 }
 
 webui_has_busybox_httpd() {
-  if ! command -v busybox >/dev/null 2>&1; then
+  PATH="$WEBUI_PATH" command -v busybox >/dev/null 2>&1 || return 1
+  if ! PATH="$WEBUI_PATH" busybox --list 2>/dev/null | grep -qx 'httpd'; then
     return 1
   fi
-  busybox --list 2>/dev/null | grep -qx 'httpd'
 }
 
 webui_server_type() {
-  if command -v uhttpd >/dev/null 2>&1; then
+  if PATH="$WEBUI_PATH" command -v uhttpd >/dev/null 2>&1; then
     echo "uhttpd"
     return
   fi
-  if command -v uhttpd_kn >/dev/null 2>&1; then
+  if PATH="$WEBUI_PATH" command -v uhttpd_kn >/dev/null 2>&1; then
     echo "uhttpd_kn"
     return
   fi
-  if command -v httpd >/dev/null 2>&1; then
+  if PATH="$WEBUI_PATH" command -v httpd >/dev/null 2>&1; then
     echo "httpd"
     return
   fi
@@ -1078,11 +1079,11 @@ webui_ensure_server_binary() {
   fi
 
   if command -v opkg >/dev/null 2>&1; then
-    opkg install uhttpd 2>/dev/null || true
-    [ "$(webui_server_type)" != "none" ] || opkg install uhttpd_kn 2>/dev/null || true
-    [ "$(webui_server_type)" != "none" ] || opkg install uhttpd-kn 2>/dev/null || true
-    [ "$(webui_server_type)" != "none" ] || opkg install busybox-httpd 2>/dev/null || true
-    [ "$(webui_server_type)" != "none" ] || opkg install busybox 2>/dev/null || true
+    PATH="$WEBUI_PATH" opkg install uhttpd 2>/dev/null || true
+    [ "$(webui_server_type)" != "none" ] || PATH="$WEBUI_PATH" opkg install uhttpd_kn 2>/dev/null || true
+    [ "$(webui_server_type)" != "none" ] || PATH="$WEBUI_PATH" opkg install uhttpd-kn 2>/dev/null || true
+    [ "$(webui_server_type)" != "none" ] || PATH="$WEBUI_PATH" opkg install busybox-httpd 2>/dev/null || true
+    [ "$(webui_server_type)" != "none" ] || PATH="$WEBUI_PATH" opkg install busybox 2>/dev/null || true
   elif command -v apk >/dev/null 2>&1; then
     apk add uhttpd busybox 2>/dev/null || apk add busybox 2>/dev/null || true
   elif command -v apt-get >/dev/null 2>&1; then
