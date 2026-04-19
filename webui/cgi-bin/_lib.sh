@@ -228,7 +228,7 @@ orch_max_strategy_for_profile() {
 
 profile_proto() {
   case "$1" in
-    1|2|3|4|7) echo "tls" ;;
+    1|2|3|4) echo "tls" ;;
     5|6) echo "udp" ;;
     *) echo "" ;;
   esac
@@ -256,8 +256,6 @@ all_profiles_json() {
   profile_json 5 "YouTube QUIC" "UDP 443 для YouTube"
   printf ','
   profile_json 6 "Voice UDP" "Discord/STUN и голосовые сервисы"
-  printf ','
-  profile_json 7 "Telegram" "MTProto/Telegram"
   printf ']'
 }
 
