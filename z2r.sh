@@ -1129,6 +1129,8 @@ webui_install_service() {
 START=95
 STOP=10
 USE_PROCD=1
+PATH=/opt/bin:/opt/sbin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
 
 start_service() {
   procd_open_instance
@@ -1148,6 +1150,8 @@ EOF
     "entware")
       cat > /opt/etc/init.d/S92z2r-webui <<'EOF'
 #!/bin/sh
+PATH=/opt/bin:/opt/sbin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
 case "$1" in
   start) bash /opt/zapret2/webui/run-webui.sh start ;;
   stop) bash /opt/zapret2/webui/run-webui.sh stop ;;
@@ -1167,6 +1171,7 @@ After=network.target
 
 [Service]
 Type=simple
+Environment=PATH=/opt/bin:/opt/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=bash /opt/zapret2/webui/run-webui.sh run
 Restart=always
 RestartSec=2
@@ -1179,6 +1184,8 @@ EOF
       else
         cat > "$WEBUI_ROOT/run.sh" <<'EOF'
 #!/bin/sh
+PATH=/opt/bin:/opt/sbin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
 bash /opt/zapret2/webui/run-webui.sh start
 EOF
         chmod +x "$WEBUI_ROOT/run.sh"

@@ -2,6 +2,9 @@
 
 set -u
 
+PATH="/opt/bin:/opt/sbin:$PATH"
+export PATH
+
 WEBUI_ROOT="/opt/zapret2/webui"
 ZAPRET_ROOT="/opt/zapret2"
 CONFIG_FILE="$ZAPRET_ROOT/config"

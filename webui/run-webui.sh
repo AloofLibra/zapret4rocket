@@ -2,6 +2,9 @@
 
 set -eu
 
+PATH="/opt/bin:/opt/sbin:$PATH"
+export PATH
+
 WEBUI_ROOT="/opt/zapret2/webui"
 WEBUI_WWW="$WEBUI_ROOT/www"
 WEBUI_CGI="$WEBUI_ROOT/cgi-bin"
