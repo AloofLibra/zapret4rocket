@@ -1132,14 +1132,14 @@ USE_PROCD=1
 
 start_service() {
   procd_open_instance
-  procd_set_param command /opt/zapret2/webui/run-webui.sh run
+  procd_set_param command bash /opt/zapret2/webui/run-webui.sh run
   procd_set_param stdout 1
   procd_set_param stderr 1
   procd_close_instance
 }
 
 stop_service() {
-  /opt/zapret2/webui/run-webui.sh stop >/dev/null 2>&1 || true
+  bash /opt/zapret2/webui/run-webui.sh stop >/dev/null 2>&1 || true
 }
 EOF
       chmod +x /etc/init.d/z2r-webui
@@ -1149,10 +1149,10 @@ EOF
       cat > /opt/etc/init.d/S92z2r-webui <<'EOF'
 #!/bin/sh
 case "$1" in
-  start) /opt/zapret2/webui/run-webui.sh start ;;
-  stop) /opt/zapret2/webui/run-webui.sh stop ;;
-  restart) /opt/zapret2/webui/run-webui.sh restart ;;
-  status) /opt/zapret2/webui/run-webui.sh status ;;
+  start) bash /opt/zapret2/webui/run-webui.sh start ;;
+  stop) bash /opt/zapret2/webui/run-webui.sh stop ;;
+  restart) bash /opt/zapret2/webui/run-webui.sh restart ;;
+  status) bash /opt/zapret2/webui/run-webui.sh status ;;
   *) echo "usage: $0 {start|stop|restart|status}"; exit 1 ;;
 esac
 EOF
@@ -1167,7 +1167,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/zapret2/webui/run-webui.sh run
+ExecStart=bash /opt/zapret2/webui/run-webui.sh run
 Restart=always
 RestartSec=2
 
@@ -1179,7 +1179,7 @@ EOF
       else
         cat > "$WEBUI_ROOT/run.sh" <<'EOF'
 #!/bin/sh
-/opt/zapret2/webui/run-webui.sh start
+bash /opt/zapret2/webui/run-webui.sh start
 EOF
         chmod +x "$WEBUI_ROOT/run.sh"
       fi
@@ -1199,7 +1199,7 @@ webui_start_service() {
       if command -v systemctl >/dev/null 2>&1 && [ -f /etc/systemd/system/z2r-webui.service ]; then
         systemctl restart z2r-webui.service
       else
-        "$WEBUI_RUNNER" restart >/dev/null 2>&1 || "$WEBUI_RUNNER" start >/dev/null 2>&1
+        bash "$WEBUI_RUNNER" restart >/dev/null 2>&1 || bash "$WEBUI_RUNNER" start >/dev/null 2>&1
       fi
       ;;
   esac

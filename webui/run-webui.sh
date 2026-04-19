@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -eu
 
@@ -131,7 +131,7 @@ start_server() {
     echo "already running"
     return 0
   fi
-  nohup "$0" run >>"$LOG_FILE" 2>&1 &
+  nohup bash "$0" run >>"$LOG_FILE" 2>&1 &
   echo $! > "$PID_FILE"
   sleep 1
   if ! is_running; then
