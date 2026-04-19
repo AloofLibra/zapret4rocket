@@ -1117,7 +1117,21 @@ webui_install_files() {
   webui_repo_fetch "cgi-bin/meta.cgi" "$WEBUI_CGI/meta.cgi" || return 1
 
   chmod +x "$WEBUI_RUNNER" "$WEBUI_CGI"/*.sh "$WEBUI_CGI"/*.cgi
+  webui_fix_interpreters
   ln -sfn ../cgi-bin "$WEBUI_WWW/cgi-bin"
+}
+
+webui_fix_interpreters() {
+  local bash_bin="" f
+
+  [ -x /opt/bin/bash ] && bash_bin="/opt/bin/bash"
+  [ -n "$bash_bin" ] || return 0
+
+  for f in "$WEBUI_RUNNER" "$WEBUI_CGI"/*.sh "$WEBUI_CGI"/*.cgi; do
+    [ -f "$f" ] || continue
+    sed -i "1s|^#!.*bash$|#!$bash_bin|" "$f" 2>/dev/null || true
+    chmod +x "$f" 2>/dev/null || true
+  done
 }
 
 webui_install_service() {
