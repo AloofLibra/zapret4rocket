@@ -122,6 +122,8 @@ NFQWS2_OPT="
 --lua-desync=multisplit:blob=fake_default_tls:tcp_ts=-1000:pos=2:nodrop:strategy=24 --lua-desync=fakeddisorder:pos=endsld:tcp_ts=-1000:strategy=24
 --lua-desync=fake:blob=fake_default_tls:tcp_ts=-500:repeats=2:strategy=25 --lua-desync=multisplit:pos=1,midsld:strategy=25
 --lua-desync=multisplit:seqovl=666:seqovl_pattern=custom:strategy=26 --lua-desync=multidisorder:pos=1,midsld:strategy=26
+--lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-1000:tcp_md5:repeats=4:strategy=27
+--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1:strategy=28
 
 --new
 
@@ -158,6 +160,8 @@ NFQWS2_OPT="
 --lua-desync=multisplit:blob=fake_default_tls:tcp_ts=-1000:pos=2:nodrop:strategy=24 --lua-desync=fakeddisorder:pos=endsld:tcp_ts=-1000:strategy=24
 --lua-desync=fake:blob=fake_default_tls:tcp_ts=-500:repeats=2:strategy=25 --lua-desync=multisplit:pos=1,midsld:strategy=25
 --lua-desync=multisplit:seqovl=666:seqovl_pattern=custom:strategy=26 --lua-desync=multidisorder:pos=1,midsld:strategy=26
+--lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-1000:tcp_md5:repeats=4:strategy=27
+--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1:strategy=28
 
 --new
 
@@ -196,6 +200,9 @@ NFQWS2_OPT="
 --lua-desync=multisplit:blob=fake_default_tls:tcp_ts=-1000:pos=2:nodrop:strategy=24 --lua-desync=fakeddisorder:pos=endsld:tcp_ts=-1000:strategy=24
 --lua-desync=fake:blob=fake_default_tls:tcp_ts=-500:repeats=2:strategy=25 --lua-desync=multisplit:pos=1,midsld:strategy=25
 --lua-desync=multisplit:seqovl=666:seqovl_pattern=custom:strategy=26 --lua-desync=multidisorder:pos=1,midsld:strategy=26
+--lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-1000:tcp_md5:repeats=4:strategy=27
+--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1:strategy=28
+
 --new
 
 #Отдельные стратегии для TCP_Discord
@@ -231,7 +238,8 @@ NFQWS2_OPT="
 --lua-desync=multisplit:blob=fake_default_tls:tcp_ts=-1000:pos=2:nodrop:strategy=24 --lua-desync=fakeddisorder:pos=endsld:tcp_ts=-1000:strategy=24
 --lua-desync=fake:blob=fake_default_tls:tcp_ts=-500:repeats=2:strategy=25 --lua-desync=multisplit:pos=1,midsld:strategy=25
 --lua-desync=multisplit:seqovl=666:seqovl_pattern=custom:strategy=26 --lua-desync=multidisorder:pos=1,midsld:strategy=26
-
+--lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-1000:tcp_md5:repeats=4:strategy=27
+--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1:strategy=28
 
 --new
 
@@ -301,7 +309,6 @@ NFQWS2_OPT="
 
 --new
 
-
   #Z2R_FALLBACK_BEGIN
   #Безразборный блок (fallback).
 --skip --filter-tcp=443 --filter-l7=tls
@@ -336,10 +343,10 @@ NFQWS2_OPT="
 --lua-desync=multisplit:blob=fake_default_tls:tcp_ts=-1000:pos=2:nodrop:strategy=24 --lua-desync=fakeddisorder:pos=endsld:tcp_ts=-1000:strategy=24
 --lua-desync=fake:blob=fake_default_tls:tcp_ts=-500:repeats=2:strategy=25 --lua-desync=multisplit:pos=1,midsld:strategy=25
 --lua-desync=multisplit:seqovl=666:seqovl_pattern=custom:strategy=26 --lua-desync=multidisorder:pos=1,midsld:strategy=26
+--lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-1000:tcp_md5:repeats=4:strategy=27
+--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1:strategy=28
   #Z2R_FALLBACK_END
   
-
-
 "
 
 
