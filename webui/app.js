@@ -2,6 +2,9 @@ const state = {
   meta: {},
   locks: [],
   status: null,
+  builderMeta: { profiles: [] },
+  builderCandidates: {},
+  builderDiscoveryState: {},
 };
 
 const views = {
@@ -34,8 +37,17 @@ async function api(path, options = {}) {
   return data;
 }
 
+async function safeApi(path, options = {}, fallback = null) {
+  try {
+    return await api(path, options);
+  } catch (_) {
+    return fallback;
+  }
+}
+
 function switchView(view) {
   Object.entries(views).forEach(([name, element]) => {
+    if (!element) return;
     element.classList.toggle('is-active', name === view);
   });
   document.querySelectorAll('.tab').forEach((tab) => {
@@ -77,6 +89,170 @@ function renderStatus() {
     node.querySelector('.current-lock').textContent = profile.current_lock || '0';
     statusProfiles.appendChild(node);
   });
+}
+
+function renderChecks(payload) {
+  const container = document.getElementById('check-results');
+  container.classList.remove('empty');
+  container.innerHTML = '';
+
+  payload.results.forEach((item) => {
+    const article = document.createElement('article');
+    article.className = 'check-item';
+    article.innerHTML = `
+      <div class="check-title">
+        <strong>${item.label}</strong>
+        <span>${item.target}</span>
+      </div>
+      <div class="check-pair">
+        <span class="${item.tls12 ? 'ok' : 'bad'}">TLS 1.2: ${item.tls12 ? 'OK' : 'FAIL'}</span>
+        <span class="${item.tls13 ? 'ok' : 'bad'}">TLS 1.3: ${item.tls13 ? 'OK' : 'FAIL'}</span>
+      </div>
+    `;
+    container.appendChild(article);
+  });
+}
+
+function builderProfileInfo(profileId) {
+  const profiles = Array.isArray(state.builderMeta.profiles)
+    ? state.builderMeta.profiles
+    : (Array.isArray(state.builderMeta.catalog?.profiles) ? state.builderMeta.catalog.profiles : []);
+  return profiles.find((item) => Number(item.profile) === Number(profileId));
+}
+
+function builderPayload(profileId) {
+  return state.builderCandidates[profileId] || { candidates: [], last_session: { results: [] } };
+}
+
+function builderDiscoveryState(profileId) {
+  return state.builderDiscoveryState[profileId] || { running: false, status: 'idle', message: 'No active discovery' };
+}
+
+function ensureDiscoveryPolling() {
+  const running = Object.values(state.builderDiscoveryState).some((item) => item && item.running);
+  if (running && !ensureDiscoveryPolling.timer) {
+    ensureDiscoveryPolling.timer = window.setInterval(() => {
+      refreshAll().catch(() => {});
+    }, 3000);
+  }
+  if (!running && ensureDiscoveryPolling.timer) {
+    window.clearInterval(ensureDiscoveryPolling.timer);
+    ensureDiscoveryPolling.timer = null;
+  }
+}
+
+function makeBuilderPanel(profile) {
+  const info = builderProfileInfo(profile.profile);
+  if (!info || !info.supported) return null;
+
+  const payload = builderPayload(profile.profile);
+  const discovery = builderDiscoveryState(profile.profile);
+  const panel = document.createElement('section');
+  panel.className = 'panel';
+  const activeText = info.active_candidate
+    ? `${info.active_candidate} / strategy ${info.active_strategy || '0'}`
+    : 'none';
+
+  panel.innerHTML = `
+    <div class="panel-header">
+      <h2>Builder</h2>
+    </div>
+    <div class="meta">
+      <div class="meta-line">
+        <span>Active generated</span>
+        <strong>${activeText}</strong>
+      </div>
+      <div class="meta-line">
+        <span>Discovery</span>
+        <strong class="builder-status builder-status-${discovery.status || 'idle'}">${discovery.message || discovery.status || 'idle'}</strong>
+      </div>
+    </div>
+  `;
+
+  const actions = document.createElement('div');
+  actions.className = 'card-actions';
+
+  const discoverButton = document.createElement('button');
+  discoverButton.type = 'button';
+  discoverButton.className = 'primary';
+  discoverButton.textContent = discovery.running ? 'Discovery running...' : 'Run discovery';
+  discoverButton.disabled = Boolean(discovery.running);
+  discoverButton.addEventListener('click', async () => {
+    try {
+      const payload = await api('/cgi-bin/discovery-start.cgi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ profile: profile.profile }),
+      });
+      if (payload.queued) {
+        showBanner(`Discovery поставлен в очередь для ${profile.label}.`);
+      } else {
+        showBanner(`Discovery завершён для ${profile.label}.`);
+      }
+      await refreshAll();
+    } catch (error) {
+      showBanner(error.message, 'error');
+    }
+  });
+  actions.appendChild(discoverButton);
+
+  if (payload.candidates.length > 0) {
+    const select = document.createElement('select');
+    payload.candidates.forEach((candidate) => {
+      const option = document.createElement('option');
+      option.value = candidate.candidate;
+      option.textContent = `${candidate.candidate} - ${candidate.label}`;
+      if (candidate.active) option.selected = true;
+      select.appendChild(option);
+    });
+    actions.appendChild(select);
+
+    const applyButton = document.createElement('button');
+    applyButton.type = 'button';
+    applyButton.className = 'ghost';
+    applyButton.textContent = 'Apply candidate';
+    applyButton.addEventListener('click', async () => {
+      try {
+        const payload = await api('/cgi-bin/apply-candidate.cgi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ profile: profile.profile, candidate: select.value }),
+        });
+        if (payload.queued && !payload.applied) {
+          showBanner(`Candidate ${select.value} поставлен в очередь для ${profile.label}.`);
+        } else {
+          showBanner(`Candidate ${select.value} применён для ${profile.label}.`);
+        }
+        await refreshAll();
+      } catch (error) {
+        showBanner(error.message, 'error');
+      }
+    });
+    actions.appendChild(applyButton);
+  }
+
+  panel.appendChild(actions);
+
+  const results = (payload.last_session && payload.last_session.results) || [];
+  if (results.length > 0) {
+    const list = document.createElement('div');
+    list.className = 'checks';
+    list.innerHTML = results.slice(0, 3).map((item) => `
+      <article class="check-item">
+        <div class="check-title">
+          <strong>${item.candidate}</strong>
+          <span>${item.label}</span>
+        </div>
+        <div class="check-pair">
+          <span class="${item.result === 'fail' ? 'bad' : 'ok'}">${item.result} / score ${item.score}</span>
+          <span>elapsed ${item.elapsed_ms} ms</span>
+        </div>
+      </article>
+    `).join('');
+    panel.appendChild(list);
+  }
+
+  return panel;
 }
 
 function renderStrategies() {
@@ -133,43 +309,42 @@ function renderStrategies() {
       }
     });
 
+    const builderPanel = makeBuilderPanel(profile);
+    if (builderPanel) {
+      node.appendChild(builderPanel);
+    }
+
     container.appendChild(node);
   });
 }
 
-function renderChecks(payload) {
-  const container = document.getElementById('check-results');
-  container.classList.remove('empty');
-  container.innerHTML = '';
-
-  payload.results.forEach((item) => {
-    const article = document.createElement('article');
-    article.className = 'check-item';
-    article.innerHTML = `
-      <div class="check-title">
-        <strong>${item.label}</strong>
-        <span>${item.target}</span>
-      </div>
-      <div class="check-pair">
-        <span class="${item.tls12 ? 'ok' : 'bad'}">TLS 1.2: ${item.tls12 ? 'OK' : 'FAIL'}</span>
-        <span class="${item.tls13 ? 'ok' : 'bad'}">TLS 1.3: ${item.tls13 ? 'OK' : 'FAIL'}</span>
-      </div>
-    `;
-    container.appendChild(article);
-  });
-}
-
 async function refreshAll() {
-  const [meta, status, locks] = await Promise.all([
+  const [meta, status, locks, builderMeta, builder1, builder2, discovery1, discovery2] = await Promise.all([
     api('/cgi-bin/meta.cgi'),
     api('/cgi-bin/status.cgi'),
     api('/cgi-bin/locks.cgi'),
+    safeApi('/cgi-bin/builder-meta.cgi', {}, { profiles: [] }),
+    safeApi('/cgi-bin/builder-candidates.cgi?profile=1', {}, { profile: 1, candidates: [], last_session: { results: [] } }),
+    safeApi('/cgi-bin/builder-candidates.cgi?profile=2', {}, { profile: 2, candidates: [], last_session: { results: [] } }),
+    safeApi('/cgi-bin/discovery-results.cgi?profile=1', {}, { discovery_state: { running: false, status: 'idle', message: 'No active discovery' } }),
+    safeApi('/cgi-bin/discovery-results.cgi?profile=2', {}, { discovery_state: { running: false, status: 'idle', message: 'No active discovery' } }),
   ]);
+
   state.meta = meta;
   state.status = status;
   state.locks = locks.profiles;
+  state.builderMeta = builderMeta || { profiles: [] };
+  state.builderCandidates = {
+    1: builder1 || { candidates: [], last_session: { results: [] } },
+    2: builder2 || { candidates: [], last_session: { results: [] } },
+  };
+  state.builderDiscoveryState = {
+    1: (discovery1 && discovery1.discovery_state) || { running: false, status: 'idle', message: 'No active discovery' },
+    2: (discovery2 && discovery2.discovery_state) || { running: false, status: 'idle', message: 'No active discovery' },
+  };
   renderStatus();
   renderStrategies();
+  ensureDiscoveryPolling();
 }
 
 document.querySelectorAll('.tab').forEach((tab) => {

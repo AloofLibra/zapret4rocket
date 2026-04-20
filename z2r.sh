@@ -86,14 +86,142 @@ source "$SCRIPT_DIR/zapret2/z2r_lib/premium.sh"
 # Функции: get_active_strat_num, get_current_strategies_info, try_strategies, Strats_Tryer
 source "$SCRIPT_DIR/zapret2/z2r_lib/strategies.sh" 
 
-# Подменю (UI-обвязка над Strats_Tryer + доп. меню управления: FLOWOFFLOAD, TCP443, провайдер)
-# Функции: strategies_submenu, flowoffload_submenu, tcp443_submenu, provider_submenu
+# Подменю (UI-обвязка над Strats_Tryer + доп. меню управления: FLOWOFFLOAD, TCP443, провайдер, builder-first)
+# Функции: strategies_submenu, flowoffload_submenu, tcp443_submenu, provider_submenu, builder_submenu
 source "$SCRIPT_DIR/zapret2/z2r_lib/submenus.sh" 
 
 # Действия меню (бэкапы/сбросы/переключатели)
 # Функции: backup_strats, menu_action_update_config_reset, menu_action_toggle_bolvan_ports,
 #          menu_action_toggle_fwtype, menu_action_toggle_udp_range, menu_action_set_tls_blob
 source "$SCRIPT_DIR/zapret2/z2r_lib/actions.sh" 
+
+# Builder-first модуль (опционально). Никакого runtime auto switching:
+# только discovery/list/apply через явные пункты меню.
+BUILDER_MODULE_PATH=""
+
+builder_api_resolve() {
+  local candidate=""
+  for candidate in "$@"; do
+    if type "$candidate" >/dev/null 2>&1; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+builder_try_source_module() {
+  local candidate="$1"
+  [ -n "$BUILDER_MODULE_PATH" ] && return 0
+  [ -f "$candidate" ] || return 1
+
+  # shellcheck disable=SC1090
+  source "$candidate"
+  BUILDER_MODULE_PATH="$candidate"
+  return 0
+}
+
+builder_deploy_optional_module() {
+  local repo_builder="" target_dir="/opt/zapret2/z2r_lib" target_file=""
+
+  for repo_builder in \
+    "$SCRIPT_DIR/lib/strategy_builder.sh" \
+    "$SCRIPT_DIR/zapret2/z2r_lib/strategy_builder.sh"
+  do
+    if [ -f "$repo_builder" ]; then
+      mkdir -p "$target_dir"
+      target_file="$target_dir/strategy_builder.sh"
+      cp -f "$repo_builder" "$target_file"
+      chmod +x "$target_file" 2>/dev/null || true
+      [ -n "$BUILDER_MODULE_PATH" ] || BUILDER_MODULE_PATH="$target_file"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+builder_available_text() {
+  if builder_api_resolve \
+    builder_discovery_wizard \
+    builder_saved_candidates_menu \
+    builder_apply_candidate \
+    >/dev/null 2>&1; then
+    echo "API готов"
+    return
+  fi
+
+  if [ -n "$BUILDER_MODULE_PATH" ] && [ -f "$BUILDER_MODULE_PATH" ]; then
+    echo "модуль найден"
+    return
+  fi
+
+  echo "не найден"
+}
+
+builder_module_run_discovery() {
+  local profile="${1:-}"
+  local fn=""
+
+  if fn="$(builder_api_resolve \
+    builder_discovery_wizard \
+  )"; then
+    "$fn" "$profile"
+    return $?
+  fi
+
+  if [ -n "$BUILDER_MODULE_PATH" ] && [ -f "$BUILDER_MODULE_PATH" ]; then
+    bash "$BUILDER_MODULE_PATH" discovery "$profile"
+    return $?
+  fi
+
+  echo -e "${yellow}Builder-модуль пока недоступен. Подключение меню уже подготовлено.${plain}"
+  return 1
+}
+
+builder_module_show_candidates() {
+  local profile="${1:-}"
+  local fn=""
+
+  if fn="$(builder_api_resolve \
+    builder_saved_candidates_menu \
+  )"; then
+    "$fn" "$profile"
+    return $?
+  fi
+
+  if [ -n "$BUILDER_MODULE_PATH" ] && [ -f "$BUILDER_MODULE_PATH" ]; then
+    bash "$BUILDER_MODULE_PATH" candidates "$profile"
+    return $?
+  fi
+
+  return 127
+}
+
+builder_module_apply_generated() {
+  local profile="${1:-}"
+  local candidate_id="${2:-}"
+  local fn=""
+
+  if fn="$(builder_api_resolve \
+    builder_apply_candidate \
+  )"; then
+    "$fn" "$profile" "$candidate_id" "persist"
+    return $?
+  fi
+
+  if [ -n "$BUILDER_MODULE_PATH" ] && [ -f "$BUILDER_MODULE_PATH" ]; then
+    bash "$BUILDER_MODULE_PATH" apply-generated "$profile" "$candidate_id"
+    return $?
+  fi
+
+  echo -e "${yellow}Builder apply API пока недоступен. Runtime auto switching не включается.${plain}"
+  return 1
+}
+
+builder_try_source_module "$SCRIPT_DIR/lib/strategy_builder.sh" || true
+builder_try_source_module "$SCRIPT_DIR/zapret2/z2r_lib/strategy_builder.sh" || true
+builder_try_source_module "/opt/zapret2/z2r_lib/strategy_builder.sh" || true
 
 detect_os() {
   if [[ -f /etc/os-release ]]; then
@@ -691,8 +819,10 @@ run_cdn_test() {
 get_repo() {
   mkdir -p /opt/zapret2/lists /opt/zapret2/extra_strats /opt/zapret2/extra_strats/cache
   mkdir -p /opt/zapret2/extra_strats/cache/orchestra
+  mkdir -p /opt/zapret2/z2r_lib
   chmod 777 /opt/zapret2/extra_strats/cache/orchestra 2>/dev/null || true
   orchestra_update_from_repo || true
+  builder_deploy_optional_module || true
   for listfile in cloudflare-ipset.txt cloudflare-ipset_v6.txt netrogat.txt russia-discord.txt russia-youtube-rtmps.txt russia-youtube.txt russia-youtubeQ.txt tg_cidr.txt; do
     curl -L -o /opt/zapret2/lists/$listfile https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z4r/lists/$listfile
   done
@@ -1115,6 +1245,12 @@ webui_install_files() {
   webui_repo_fetch "cgi-bin/restart.cgi" "$WEBUI_CGI/restart.cgi" || return 1
   webui_repo_fetch "cgi-bin/check.cgi" "$WEBUI_CGI/check.cgi" || return 1
   webui_repo_fetch "cgi-bin/meta.cgi" "$WEBUI_CGI/meta.cgi" || return 1
+  webui_repo_fetch "cgi-bin/builder-meta.cgi" "$WEBUI_CGI/builder-meta.cgi" || return 1
+  webui_repo_fetch "cgi-bin/builder-candidates.cgi" "$WEBUI_CGI/builder-candidates.cgi" || return 1
+  webui_repo_fetch "cgi-bin/discovery-start.cgi" "$WEBUI_CGI/discovery-start.cgi" || return 1
+  webui_repo_fetch "cgi-bin/discovery-results.cgi" "$WEBUI_CGI/discovery-results.cgi" || return 1
+  webui_repo_fetch "cgi-bin/apply-candidate.cgi" "$WEBUI_CGI/apply-candidate.cgi" || return 1
+  webui_repo_fetch "cgi-bin/active-generated.cgi" "$WEBUI_CGI/active-generated.cgi" || return 1
 
   chmod +x "$WEBUI_RUNNER" "$WEBUI_CGI"/*.sh "$WEBUI_CGI"/*.cgi
   webui_fix_interpreters
@@ -1389,6 +1525,7 @@ Enter (без цифр) - переустановка/обновление zapret
 '"${Fcyan}"'14.'"${yellow}"' Активировать доступ в меню через браузер (~3мб места)
 '"${Fcyan}"'15.'"${yellow}"' Провайдер
 '"${Fcyan}"'16.'"${yellow}"' Сменить TLS blob (--blob=maxru). Сейчас: '"${plain}"'['"$(tls_blob_menu_text)"']'"${yellow}"'
+'"${Fcyan}"'17.'"${yellow}"' Builder-first MVP: discovery/candidates/generated. Сейчас: '"${plain}"'['"$(builder_available_text)"']'"${yellow}"'
 '"${Fcyan}"'777.'"${yellow}"' Активировать zeefeer premium (Нажимать только Valery ProD, avg97, Xoz, GeGunT, blagodarenya, mikhyan, Xoz, andric62, Whoze, Necronicle, Andrei_5288515371, Nomand, Dina_turat, Nergalss, Александру, АлександруП, vecheromholodno, ЕвгениюГ, Dyadyabo, skuwakin, izzzgoy, Grigaraz, Reconnaissance, comandante1928, umad, rudnev2028, rutakote, railwayfx, vtokarev1604, Grigaraz, a40letbezurojaya и subzeero452 и остальным поддержавшим проект. Но если очень хочется - можно нажать и другим)\033[0m'
     if [[ -f "$PREMIUM_FLAG" ]]; then
       echo -e "${red}999. Секретный пункт. Нажимать на свой страх и риск${plain}"
@@ -1543,6 +1680,10 @@ Enter (без цифр) - переустановка/обновление zapret
 
   "16")
     menu_action_set_tls_blob
+    ;;
+
+  "17")
+    builder_submenu
     ;;
 
 

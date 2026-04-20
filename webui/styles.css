@@ -28,7 +28,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -113,6 +114,11 @@ button.primary {
   color: #fff;
 }
 
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 button.ghost {
   background: transparent;
 }
@@ -145,6 +151,11 @@ button.ghost {
 .actions {
   justify-content: flex-start;
   flex-wrap: wrap;
+}
+
+.card-actions {
+  flex-wrap: wrap;
+  align-items: stretch;
 }
 
 .stats-grid,
@@ -199,6 +210,26 @@ label span {
   margin: 14px 0;
 }
 
+.builder-status {
+  text-transform: none;
+}
+
+.builder-status-running {
+  color: var(--accent);
+}
+
+.builder-status-completed {
+  color: var(--success);
+}
+
+.builder-status-failed {
+  color: var(--danger);
+}
+
+.builder-status-idle {
+  color: var(--muted);
+}
+
 .lock-form {
   display: grid;
   gap: 14px;
@@ -209,12 +240,32 @@ label {
   gap: 8px;
 }
 
-input {
+input,
+select {
   width: 100%;
+  max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px 14px;
   background: #fffdfa;
+  min-width: 0;
+}
+
+.card-actions > button,
+.card-actions > select {
+  flex: 1 1 160px;
+}
+
+.panel {
+  overflow: hidden;
+}
+
+.profile-card {
+  overflow: hidden;
+}
+
+.check-item {
+  overflow-wrap: anywhere;
 }
 
 .checks {

@@ -222,3 +222,85 @@ provider_submenu() {
     esac
   done
 }
+
+builder_profile_pick() {
+  local prompt="${1:-Выберите builder-профиль}"
+  local answer=""
+
+  echo -e "${cyan}${prompt}${plain}" >&2
+  echo "1 - YouTube TCP" >&2
+  echo "2 - Googlevideo" >&2
+  echo "0 - Назад" >&2
+  read -re -p "Ваш выбор: " answer
+  case "$answer" in
+    1|2)
+      printf '%s\n' "$answer"
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+builder_candidates_count() {
+  local profile="$1"
+  if type builder_list_candidates_tsv >/dev/null 2>&1; then
+    builder_list_candidates_tsv "$profile" 2>/dev/null | awk 'END{print NR+0}'
+    return
+  fi
+  echo "0"
+}
+
+builder_submenu() {
+  while true; do
+    local p1_count p2_count
+    p1_count="$(builder_candidates_count 1)"
+    p2_count="$(builder_candidates_count 2)"
+
+    clear
+    echo -e "${cyan}--- Builder-first MVP ---${plain}"
+    echo -e "Статус builder: ${green}$(builder_available_text)${plain}"
+    echo -e "Saved candidates: ${yellow}P1=${p1_count}${plain} ${yellow}P2=${p2_count}${plain}"
+    echo ""
+
+    submenu_item "1" "Discovery builder"
+    submenu_item "2" "Просмотр сохранённых candidates"
+    submenu_item "3" "Применить сохранённую generated strategy"
+    submenu_item "0" "Назад"
+    echo ""
+
+    read -re -p "Ваш выбор: " ans
+
+    case "$ans" in
+      "1")
+        if profile="$(builder_profile_pick "Для какого профиля запустить discovery?")"; then
+          builder_module_run_discovery "$profile"
+        fi
+        ;;
+      "2")
+        if profile="$(builder_profile_pick "Для какого профиля показать candidates?")"; then
+          if ! builder_module_show_candidates "$profile"; then
+            echo -e "${yellow}Builder API недоступен.${plain}"
+            pause_enter
+          fi
+        fi
+        ;;
+      "3")
+        if profile="$(builder_profile_pick "Для какого профиля применить saved candidate?")"; then
+          if ! builder_module_show_candidates "$profile"; then
+            echo -e "${yellow}Builder API недоступен.${plain}"
+            pause_enter
+          fi
+        fi
+        ;;
+      "0"|"")
+        return
+        ;;
+      *)
+        echo -e "${yellow}Неверный ввод.${plain}"
+        sleep 1
+        ;;
+    esac
+  done
+}
