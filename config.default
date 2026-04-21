@@ -125,6 +125,9 @@ NFQWS2_OPT="
 --lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-1000:tcp_md5:repeats=4:strategy=27
 --lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1:strategy=28
 
+# Z2R_BUILDER_BEGIN profile=1
+--lua-desync=multisplit:blob=fake_default_tls:tcp_ts=-1000:pos=2:nodrop:strategy=29 --lua-desync=fakeddisorder:pos=sniext+4:tcp_ts=-1000:strategy=29
+# Z2R_BUILDER_END profile=1
 --new
 
 --filter-tcp=443 --filter-l7=tls

@@ -1,8 +1,22 @@
 #!/bin/bash
 
+if [ "${__Z4R_STRATEGY_BUILDER_SOURCED:-0}" = "1" ]; then
+    return 0 2>/dev/null || exit 0
+fi
+__Z4R_STRATEGY_BUILDER_SOURCED=1
+
 builder_root="${builder_root:-/opt/zapret2/extra_strats/cache/builder}"
 builder_profiles_root="$builder_root/profiles"
 builder_sessions_root="$builder_root/sessions"
+builder_repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+builder_policy_store_module="${builder_policy_store_module:-/opt/zapret2/z2r_lib/policy_store.sh}"
+builder_validator_module="${builder_validator_module:-/opt/zapret2/z2r_lib/strategy_validator.sh}"
+builder_validator_daemon="${builder_validator_daemon:-/opt/zapret2/extra_strats/cache/orchestra/validator_daemon.sh}"
+builder_discovery_engine_module="${builder_discovery_engine_module:-/opt/zapret2/z2r_lib/discovery_engine.sh}"
+
+[ -f "$builder_policy_store_module" ] && . "$builder_policy_store_module"
+[ -f "$builder_validator_module" ] && . "$builder_validator_module"
+[ -f "$builder_discovery_engine_module" ] && . "$builder_discovery_engine_module"
 
 builder_init_dirs() {
     mkdir -p "$builder_profiles_root" "$builder_sessions_root"
@@ -83,6 +97,10 @@ builder_candidate_file() {
 builder_current_config_file() {
     if [ -f /opt/zapret2/config ]; then
         echo "/opt/zapret2/config"
+    elif [ -f /opt/zapret2/config.default ]; then
+        echo "/opt/zapret2/config.default"
+    elif [ -f "$builder_repo_root/config.default" ]; then
+        echo "$builder_repo_root/config.default"
     else
         echo "/opt/zapret2/config.default"
     fi
@@ -90,6 +108,36 @@ builder_current_config_file() {
 
 builder_escape_env() {
     printf "%s" "$1" | sed "s/'/'\"'\"'/g"
+}
+
+builder_json_escape() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+builder_policy_candidate_id() {
+    printf 'p%s-%s\n' "$1" "$2"
+}
+
+builder_policy_catalog_json_file() {
+    printf '%s/catalog.json\n' "$(builder_profile_dir "$1")"
+}
+
+builder_policy_catalog_lua_file() {
+    printf '%s/catalog.lua\n' "$(builder_profile_dir "$1")"
+}
+
+builder_policy_profile_state_json_file() {
+    printf '%s/policy-state.json\n' "$(builder_profile_dir "$1")"
+}
+
+builder_job_id() {
+    printf 'job-%s-%s-%s\n' "$(date +%Y%m%d%H%M%S)" "$1" "$2"
+}
+
+builder_validation_job_file() {
+    local profile="$1"
+    local job_id="$2"
+    printf '%s/%s.json\n' "$(builder_profile_dir "$profile")" "$job_id"
 }
 
 builder_write_definition() {
@@ -135,8 +183,12 @@ EOF
 
 builder_seed_profile_candidates() {
     local profile="$1"
+    if [ "${BUILDER_SEEDING_PROFILE:-}" = "$profile" ]; then
+        return 0
+    fi
     builder_profile_supported "$profile" || return 1
     builder_init_dirs
+    BUILDER_SEEDING_PROFILE="$profile"
 
     builder_write_definition "$profile" "c01" \
         "fake + multisplit" \
@@ -234,6 +286,10 @@ builder_seed_profile_candidates() {
         "multisplit:seqovl=666:seqovl_pattern=custom" \
         "multidisorder:pos=1,midsld" \
         ""
+
+    builder_sync_policy_catalog "$profile"
+    builder_sync_policy_profile_state "$profile"
+    BUILDER_SEEDING_PROFILE=""
 }
 
 builder_load_definition() {
@@ -436,6 +492,11 @@ UPDATED_AT='$(date '+%Y-%m-%d %H:%M:%S')'
 EOF
     fi
 
+    builder_sync_policy_profile_state "$profile"
+    if type policy_rebuild_runtime_snapshot >/dev/null 2>&1; then
+        policy_rebuild_runtime_snapshot >/dev/null 2>&1 || true
+    fi
+
     builder_restart_if_possible
     rm -f "$cleaned" "$lines_file"
     printf '%s\n' "$strategy_num"
@@ -443,23 +504,79 @@ EOF
 
 builder_probe_target() {
     local target="$1"
-    local start elapsed tls12=0 tls13=0 score=0 result="fail" reason="no_tls_response"
-    start="$(date +%s)"
-    curl --tls-max 1.2 --max-time 4 -s -o /dev/null "$target" && tls12=1 || true
-    curl --tlsv1.3 --max-time 4 -s -o /dev/null "$target" && tls13=1 || true
-    elapsed=$(( ($(date +%s) - start) * 1000 ))
+    local profile="${2:-0}"
+    local candidate_id="${3:-}"
+    local host="${4:-}"
+    local job_id job_file done_file result_json score elapsed verdict reason
 
-    if [ "$tls12" -eq 1 ] && [ "$tls13" -eq 1 ]; then
-        score=3000
-        result="ok"
-        reason="tls12+tls13"
-    elif [ "$tls12" -eq 1 ] || [ "$tls13" -eq 1 ]; then
-        score=2000
-        result="unstable"
-        reason="single_tls_version"
+    if ! type policy_enqueue_job >/dev/null 2>&1 || ! type validator_validate_candidate >/dev/null 2>&1; then
+        printf '0\t0\tinconclusive\tvalidator_unavailable\t%s\n' "$target"
+        return 0
     fi
 
-    printf '%s\t%s\t%s\t%s\t%s\n' "$score" "$elapsed" "$result" "$reason" "$target"
+    job_id="$(builder_job_id "$profile" "$candidate_id")"
+    job_file="$(builder_validation_job_file "$profile" "$job_id")"
+    cat > "$job_file" <<EOF
+{
+  "job_id": "$(builder_json_escape "$job_id")",
+  "type": "validate_candidate",
+  "source": "builder_discovery",
+  "profile": $profile,
+  "hosts": ["$(builder_json_escape "$host")"],
+  "candidate_id": "$(builder_json_escape "$(builder_policy_candidate_id "$profile" "$candidate_id")")",
+  "target_url": "$(builder_json_escape "$target")",
+  "reference_url": "https://example.com/",
+  "checks": {
+    "baseline": true,
+    "tls12": true,
+    "tls13": true,
+    "long_get": true,
+    "dns_check": true,
+    "ip_block_check": true,
+    "quic": false
+  },
+  "repeats": 2,
+  "timeout_sec": 4,
+  "created_at": "$(date +%Y-%m-%dT%H:%M:%S%z)"
+}
+EOF
+    policy_enqueue_job "$job_file" || {
+        rm -f "$job_file"
+        printf '0\t0\tinconclusive\tenqueue_failed\t%s\n' "$target"
+        return 1
+    }
+    rm -f "$job_file"
+
+    if [ -f "$builder_validator_daemon" ]; then
+        env \
+            policy_root="$policy_root" \
+            validator_policy_store_module="$builder_policy_store_module" \
+            validator_netcheck_module="${validator_netcheck_module:-/opt/zapret2/z2r_lib/netcheck.sh}" \
+            POLICY_STORE_MODULE="$builder_policy_store_module" \
+            VALIDATOR_MODULE="$builder_validator_module" \
+            bash "$builder_validator_daemon" once >/dev/null 2>&1 || true
+    fi
+
+    done_file="$policy_jobs_done_root/${job_id}.json"
+    [ -f "$done_file" ] || done_file="$policy_jobs_failed_root/${job_id}.json"
+    if [ ! -f "$done_file" ]; then
+        printf '0\t0\tinconclusive\tmissing_result\t%s\n' "$target"
+        return 1
+    fi
+
+    result_json="$done_file"
+    score="$(validator_json_get_number "$result_json" "score" 2>/dev/null || echo 0)"
+    elapsed="$(validator_json_get_number "$result_json" "elapsed_ms" 2>/dev/null || echo 0)"
+    verdict="$(validator_json_get_string "$result_json" "verdict" 2>/dev/null || echo inconclusive)"
+    case "$verdict" in
+        valid) reason="validator_valid" ;;
+        unstable) reason="validator_unstable" ;;
+        dns_poisoned) reason="dns_poisoned" ;;
+        transport_blocked) reason="transport_blocked" ;;
+        invalid) reason="validator_invalid" ;;
+        *) reason="validator_inconclusive" ;;
+    esac
+    printf '%s\t%s\t%s\t%s\t%s\n' "$score" "$elapsed" "$verdict" "$reason" "$target"
 }
 
 builder_restore_config_and_state() {
@@ -491,55 +608,24 @@ builder_restore_config_and_state() {
 builder_run_discovery() {
     local profile="$1"
     local session_id="${2:-$(date +%Y%m%d%H%M%S)}"
-    local cfg backup_cfg prev_locks prev_active target results_file session_dir candidate_file candidate_id strat_num lock_proto
-    local score elapsed result reason probed_target
-
-    builder_seed_profile_candidates "$profile" || return 1
-    cfg="$(builder_current_config_file)"
-    target="$(builder_profile_target "$profile")"
-    session_dir="$builder_sessions_root/$session_id"
-    results_file="$session_dir/results.tsv"
-    mkdir -p "$session_dir"
-    cat > "$session_dir/meta.env" <<EOF
-PROFILE_ID='$profile'
-TARGET='$(builder_escape_env "$target")'
-CREATED_AT='$(date '+%Y-%m-%d %H:%M:%S')'
-EOF
-
-    backup_cfg="$(mktemp)"
-    cp "$cfg" "$backup_cfg"
-    prev_locks=""
-    if type orch_locked_get >/dev/null 2>&1; then
-        for lock_proto in $(builder_profile_lock_protos "$profile"); do
-            prev_locks="${prev_locks}${prev_locks:+ }${lock_proto}=$(orch_locked_get "$profile" "$lock_proto")"
-        done
+    if type discovery_run_session >/dev/null 2>&1; then
+        discovery_run_session "$session_id" "$profile" "$(builder_profile_target "$profile")" "$(builder_profile_host_scope "$profile")"
+        return $?
     fi
-    prev_active=""
-    [ -f "$(builder_active_file "$profile")" ] && prev_active="$(cat "$(builder_active_file "$profile")")"
-
-    : > "$results_file"
-    for candidate_file in "$(builder_candidates_dir "$profile")"/*.env; do
-        [ -f "$candidate_file" ] || continue
-        candidate_id="$(basename "$candidate_file" .env)"
-        builder_load_definition "$profile" "$candidate_id" || continue
-        strat_num="$(builder_apply_candidate "$profile" "$candidate_id" "temp" 2>/dev/null)" || continue
-        IFS=$'\t' read -r score elapsed result reason probed_target <<EOF
-$(builder_probe_target "$target")
-EOF
-        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-            "$candidate_id" "$profile" "$strat_num" "$score" "$elapsed" "$result" "$reason" "$LABEL" >> "$results_file"
-    done
-
-    builder_restore_config_and_state "$cfg" "$backup_cfg" "$profile" "$prev_locks" "$prev_active"
-    printf '%s' "$session_id" > "$(builder_last_session_file "$profile")"
-    printf '%s\n' "$session_id"
+    return 1
 }
 
 builder_ranked_results() {
     local session_id="$1"
-    local results_file="$builder_sessions_root/$session_id/results.tsv"
-    [ -f "$results_file" ] || return 1
-    sort -t $'\t' -k4,4nr -k5,5n "$results_file"
+    local session_file
+    local ranking_json
+    session_file="$policy_sessions_discovery_root/$session_id.json"
+    [ -f "$session_file" ] || return 1
+    ranking_json="$(grep '"ranking": \[' "$session_file" | sed 's/^.*"ranking": //; s/,"recommended_candidate".*$//' | head -n 1)"
+    [ -n "$ranking_json" ] || return 1
+    printf '%s\n' "$ranking_json" | grep -o '{"candidate":"[^"]*","profile":[0-9]*,"strategy":"[^"]*","score":[0-9]*,"elapsed_ms":[0-9]*,"result":"[^"]*","reason":"[^"]*","label":"[^"]*"}' | \
+    sed 's/{"candidate":"\([^"]*\)","profile":\([0-9]*\),"strategy":"\([^"]*\)","score":\([0-9]*\),"elapsed_ms":\([0-9]*\),"result":"\([^"]*\)","reason":"\([^"]*\)","label":"\([^"]*\)"}/\1\t\2\t\3\t\4\t\5\t\6\t\7\t\8/' | \
+    sort -t $'\t' -k4,4nr -k5,5n
 }
 
 builder_discovery_wizard() {
@@ -667,6 +753,219 @@ builder_profile_json() {
         "$chosen"
 }
 
+builder_policy_sync_if_available() {
+    if type policy_init_dirs >/dev/null 2>&1; then
+        policy_init_dirs
+        return 0
+    fi
+    return 1
+}
+
+builder_policy_family_id() {
+    printf '%s' "$1" | tr ' ' '_' | tr '+' '_' | tr -s '_'
+}
+
+builder_policy_step_json() {
+    local step="$1"
+    local op="${step%%:*}"
+    local rest part key value
+    local first=1
+    printf '{"op":"%s","args":{' "$(builder_json_escape "$op")"
+    rest="${step#*:}"
+    if [ "$rest" != "$step" ] && [ -n "$rest" ]; then
+        local OLDIFS="$IFS"
+        IFS=':'
+        for part in $rest; do
+            key="${part%%=*}"
+            value="${part#*=}"
+            [ -n "$key" ] || continue
+            [ "$first" -eq 1 ] || printf ','
+            first=0
+            if [ "$key" = "$part" ]; then
+                printf '"%s":true' "$(builder_json_escape "$key")"
+            else
+                case "$value" in
+                    ''|*[!0-9-]*)
+                        printf '"%s":"%s"' "$(builder_json_escape "$key")" "$(builder_json_escape "$value")"
+                        ;;
+                    *)
+                        printf '"%s":%s' "$(builder_json_escape "$key")" "$value"
+                        ;;
+                esac
+            fi
+        done
+        IFS="$OLDIFS"
+    fi
+    printf '}}'
+}
+
+builder_policy_steps_json() {
+    local first=1
+    local step=""
+    printf '['
+    for step in "$STEP1" "$STEP2" "$STEP3"; do
+        [ -n "$step" ] || continue
+        [ "$first" -eq 1 ] || printf ','
+        first=0
+        builder_policy_step_json "$step"
+    done
+    printf ']'
+}
+
+builder_policy_catalog_json() {
+    local profile="$1"
+    local first_family=1
+    local first_candidate=1
+    local seen_families=""
+    local cid label family blob origin active active_strategy payloads
+
+    printf '{'
+    printf '"profile":%s,' "$profile"
+    printf '"label":"%s",' "$(builder_json_escape "$(builder_profile_label "$profile")")"
+    printf '"supported":true,'
+    printf '"families":['
+    while IFS=$'\t' read -r cid label family blob origin active active_strategy; do
+        case " $seen_families " in
+            *" $family "*) continue ;;
+        esac
+        seen_families="$seen_families $family"
+        [ "$first_family" -eq 1 ] || printf ','
+        first_family=0
+        printf '{"family_id":"%s","label":"%s"}' \
+            "$(builder_json_escape "$(builder_policy_family_id "$family")")" \
+            "$(builder_json_escape "$family")"
+    done < <(builder_list_candidates_tsv "$profile")
+    printf '],'
+    printf '"candidates":['
+    while IFS=$'\t' read -r cid label family blob origin active active_strategy; do
+        builder_load_definition "$profile" "$cid" || continue
+        payloads="${CONSTRAINTS:-tls_client_hello}"
+        [ "$first_candidate" -eq 1 ] || printf ','
+        first_candidate=0
+        printf '{'
+        printf '"candidate_id":"%s",' "$(builder_json_escape "$(builder_policy_candidate_id "$profile" "$cid")")"
+        printf '"family_id":"%s",' "$(builder_json_escape "$(builder_policy_family_id "$family")")"
+        printf '"label":"%s",' "$(builder_json_escape "$label")"
+        printf '"origin":"%s",' "$(builder_json_escape "$origin")"
+        printf '"steps":%s,' "$(builder_policy_steps_json)"
+        printf '"constraints":{"payload":["%s"]}' "$(builder_json_escape "$payloads")"
+        printf '}'
+    done < <(builder_list_candidates_tsv "$profile")
+    printf ']}'
+}
+
+builder_policy_compile_step_lua() {
+    local step="$1"
+    local op="${step%%:*}"
+    local rest part key value
+    local first=1
+    printf '        { op = "%s", args = {' "$(builder_json_escape "$op")"
+    rest="${step#*:}"
+    if [ "$rest" != "$step" ] && [ -n "$rest" ]; then
+        local OLDIFS="$IFS"
+        IFS=':'
+        for part in $rest; do
+            key="${part%%=*}"
+            value="${part#*=}"
+            [ -n "$key" ] || continue
+            [ "$first" -eq 1 ] || printf ', '
+            first=0
+            if [ "$key" = "$part" ]; then
+                printf '%s = true' "$key"
+            else
+                case "$value" in
+                    ''|*[!0-9-]*)
+                        printf '%s = "%s"' "$key" "$(builder_json_escape "$value")"
+                        ;;
+                    *)
+                        printf '%s = %s' "$key" "$value"
+                        ;;
+                esac
+            fi
+        done
+        IFS="$OLDIFS"
+    fi
+    printf '} },\n'
+}
+
+builder_policy_compile_candidates_lua() {
+    local profile="$1"
+    local first=1
+    local cid label family blob origin active active_strategy payloads step
+    while IFS=$'\t' read -r cid label family blob origin active active_strategy; do
+        builder_load_definition "$profile" "$cid" || continue
+        payloads="${CONSTRAINTS:-tls_client_hello}"
+        [ "$first" -eq 1 ] || printf ',\n'
+        first=0
+        printf '    ["%s"] = {\n' "$(builder_json_escape "$(builder_policy_candidate_id "$profile" "$cid")")"
+        printf '      profile = %s,\n' "$profile"
+        printf '      family_id = "%s",\n' "$(builder_json_escape "$(builder_policy_family_id "$family")")"
+        printf '      constraints = { payload = { ["%s"] = true } },\n' "$(builder_json_escape "$payloads")"
+        printf '      steps = {\n'
+        for step in "$STEP1" "$STEP2" "$STEP3"; do
+            [ -n "$step" ] || continue
+            builder_policy_compile_step_lua "$step"
+        done
+        printf '      }\n'
+        printf '    }'
+    done < <(builder_list_candidates_tsv "$profile")
+}
+
+builder_sync_policy_catalog() {
+    local profile="$1"
+    local json_file lua_file
+    builder_policy_sync_if_available || return 0
+    json_file="$(builder_policy_catalog_json_file "$profile")"
+    lua_file="$(builder_policy_catalog_lua_file "$profile")"
+    mkdir -p "$(dirname "$json_file")"
+    builder_policy_catalog_json "$profile" > "$json_file" || return 1
+    builder_policy_compile_candidates_lua "$profile" > "$lua_file" || return 1
+    policy_write_catalog "$profile" "$json_file" || return 1
+    policy_write_catalog_lua "$profile" "$lua_file" || return 1
+}
+
+builder_sync_policy_profile_state() {
+    local profile="$1"
+    local json_file candidate_id family_id updated_at chosen mode source status confidence
+    builder_policy_sync_if_available || return 0
+    json_file="$(builder_policy_profile_state_json_file "$profile")"
+    candidate_id=""
+    family_id=""
+    updated_at=""
+    chosen="0"
+    if [ -f "$(builder_active_file "$profile")" ]; then
+        # shellcheck disable=SC1090
+        . "$(builder_active_file "$profile")"
+        if [ -n "${CANDIDATE_ID:-}" ]; then
+            candidate_id="$(builder_policy_candidate_id "$profile" "${CANDIDATE_ID:-}")"
+            updated_at="${UPDATED_AT:-}"
+            chosen="${CHOSEN:-0}"
+            if builder_load_definition "$profile" "${CANDIDATE_ID:-}"; then
+                family_id="$(builder_policy_family_id "${FAMILY:-}")"
+            fi
+        fi
+    fi
+    mode="$([ "$chosen" = "1" ] && echo "manual_fixed" || echo "builder_temp")"
+    source="$([ "$chosen" = "1" ] && echo "manual_apply" || echo "builder_sync")"
+    status="$([ -n "$candidate_id" ] && echo "known_good" || echo "idle")"
+    confidence="$([ -n "$candidate_id" ] && echo "1" || echo "0")"
+    cat > "$json_file" <<EOF
+{
+  "profile": $profile,
+  "mode": "$mode",
+  "active_candidate_id": "$(builder_json_escape "$candidate_id")",
+  "active_family_id": "$(builder_json_escape "$family_id")",
+  "status": "$status",
+  "confidence": $confidence,
+  "pending_job_id": "",
+  "fallback_chain": [],
+  "last_validated_at": "$(builder_json_escape "$updated_at")",
+  "source": "$source"
+}
+EOF
+    policy_write_profile_state "$profile" "$json_file" || return 1
+}
+
 builder_profiles_json() {
     printf '['
     builder_profile_json 1
@@ -704,22 +1003,13 @@ builder_candidates_json() {
 
 builder_session_results_json() {
     local session_id="$1"
-    local first=1
-    printf '['
-    while IFS=$'\t' read -r candidate_id profile strat_num score elapsed result reason label; do
-        [ "$first" -eq 1 ] || printf ','
-        first=0
-        printf '{"candidate":"%s","profile":%s,"strategy":"%s","score":%s,"elapsed_ms":%s,"result":"%s","reason":"%s","label":"%s"}' \
-            "$(printf '%s' "$candidate_id" | sed 's/\\/\\\\/g; s/"/\\"/g')" \
-            "$profile" \
-            "$(printf '%s' "$strat_num" | sed 's/\\/\\\\/g; s/"/\\"/g')" \
-            "${score:-0}" \
-            "${elapsed:-0}" \
-            "$(printf '%s' "$result" | sed 's/\\/\\\\/g; s/"/\\"/g')" \
-            "$(printf '%s' "$reason" | sed 's/\\/\\\\/g; s/"/\\"/g')" \
-            "$(printf '%s' "$label" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-    done < <(builder_ranked_results "$session_id")
-    printf ']'
+    local session_file
+    session_file="$policy_sessions_discovery_root/$session_id.json"
+    [ -f "$session_file" ] || {
+        printf '[]'
+        return
+    }
+    grep '"results": \[' "$session_file" | sed 's/^.*"results": //; s/,"ranking".*$//' | head -n 1
 }
 
 builder_last_session_json() {
@@ -732,10 +1022,11 @@ builder_last_session_json() {
         printf '{"profile":%s,"session_id":"","results":[]}' "$profile"
         return
     fi
-    printf '{"profile":%s,"session_id":"%s","results":%s}' \
-        "$profile" \
-        "$(printf '%s' "$session_id" | sed 's/\\/\\\\/g; s/"/\\"/g')" \
-        "$(builder_session_results_json "$session_id")"
+    if [ -f "$policy_sessions_discovery_root/$session_id.json" ]; then
+        cat "$policy_sessions_discovery_root/$session_id.json"
+        return
+    fi
+    printf '{"profile":%s,"session_id":"%s","results":[]}' "$profile" "$(printf '%s' "$session_id" | sed 's/\\/\\\\/g; s/"/\\"/g')"
 }
 
 builder_active_json() {

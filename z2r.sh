@@ -36,7 +36,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 # Проверяем наличие всех нужных lib-файлов, иначе запускаем внешний скрипт
 missing_libs=0
 LIB_DIR="$SCRIPT_DIR/zapret2/z2r_lib"
-for lib in ui.sh provider.sh telemetry.sh recommendations.sh netcheck.sh premium.sh strategies.sh submenus.sh actions.sh; do
+for lib in ui.sh provider.sh telemetry.sh recommendations.sh netcheck.sh premium.sh strategies.sh submenus.sh actions.sh policy_store.sh strategy_validator.sh discovery_engine.sh; do
   if [ ! -f "$LIB_DIR/$lib" ]; then
     missing_libs=1
     break
@@ -125,20 +125,47 @@ builder_deploy_optional_module() {
   local repo_builder="" target_dir="/opt/zapret2/z2r_lib" target_file=""
 
   for repo_builder in \
+    "$SCRIPT_DIR/lib/policy_store.sh" \
+    "$SCRIPT_DIR/lib/discovery_engine.sh" \
     "$SCRIPT_DIR/lib/strategy_builder.sh" \
     "$SCRIPT_DIR/zapret2/z2r_lib/strategy_builder.sh"
   do
     if [ -f "$repo_builder" ]; then
       mkdir -p "$target_dir"
-      target_file="$target_dir/strategy_builder.sh"
+      target_file="$target_dir/$(basename "$repo_builder")"
       cp -f "$repo_builder" "$target_file"
       chmod +x "$target_file" 2>/dev/null || true
-      [ -n "$BUILDER_MODULE_PATH" ] || BUILDER_MODULE_PATH="$target_file"
-      return 0
+      if [ "$(basename "$repo_builder")" = "strategy_builder.sh" ]; then
+        [ -n "$BUILDER_MODULE_PATH" ] || BUILDER_MODULE_PATH="$target_file"
+      fi
     fi
   done
 
-  return 1
+  [ -n "$BUILDER_MODULE_PATH" ]
+}
+
+validator_deploy_optional_module() {
+  local repo_file="" target_dir="/opt/zapret2" target_file=""
+
+  for repo_file in \
+    "$SCRIPT_DIR/lib/strategy_validator.sh" \
+    "$SCRIPT_DIR/orchestra/validator_daemon.sh"
+  do
+    if [ -f "$repo_file" ]; then
+      case "$(basename "$repo_file")" in
+        validator_daemon.sh)
+          target_file="/opt/zapret2/extra_strats/cache/orchestra/validator_daemon.sh"
+          ;;
+        *)
+          mkdir -p "$target_dir/z2r_lib"
+          target_file="$target_dir/z2r_lib/$(basename "$repo_file")"
+          ;;
+      esac
+      mkdir -p "$(dirname "$target_file")"
+      cp -f "$repo_file" "$target_file"
+      chmod +x "$target_file" 2>/dev/null || true
+    fi
+  done
 }
 
 builder_available_text() {
@@ -820,9 +847,11 @@ get_repo() {
   mkdir -p /opt/zapret2/lists /opt/zapret2/extra_strats /opt/zapret2/extra_strats/cache
   mkdir -p /opt/zapret2/extra_strats/cache/orchestra
   mkdir -p /opt/zapret2/z2r_lib
+  mkdir -p /opt/zapret2/lua
   chmod 777 /opt/zapret2/extra_strats/cache/orchestra 2>/dev/null || true
   orchestra_update_from_repo || true
   builder_deploy_optional_module || true
+  validator_deploy_optional_module || true
   for listfile in cloudflare-ipset.txt cloudflare-ipset_v6.txt netrogat.txt russia-discord.txt russia-youtube-rtmps.txt russia-youtube.txt russia-youtubeQ.txt tg_cidr.txt; do
     curl -L -o /opt/zapret2/lists/$listfile https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z4r/lists/$listfile
   done
@@ -867,6 +896,9 @@ get_repo() {
 
 # cache
 mkdir -p /opt/zapret2/extra_strats/cache
+  curl -L -o /opt/zapret2/lua/policy-state.lua https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/lua/policy-state.lua
+  curl -L -o /opt/zapret2/lua/step-library.lua https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/lua/step-library.lua
+  curl -L -o /opt/zapret2/lua/strategy-executor.lua https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/lua/strategy-executor.lua
 
 }
 
