@@ -899,6 +899,8 @@ mkdir -p /opt/zapret2/extra_strats/cache
   curl -L -o /opt/zapret2/lua/policy-state.lua https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/lua/policy-state.lua
   curl -L -o /opt/zapret2/lua/step-library.lua https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/lua/step-library.lua
   curl -L -o /opt/zapret2/lua/strategy-executor.lua https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/lua/strategy-executor.lua
+  curl -L -o /opt/zapret2/lua/policy-rescue.lua https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/lua/policy-rescue.lua
+  curl -L -o /opt/zapret2/lua/policy-orchestrator.lua https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/lua/policy-orchestrator.lua
 
 }
 
@@ -1278,11 +1280,12 @@ webui_install_files() {
   webui_repo_fetch "cgi-bin/check.cgi" "$WEBUI_CGI/check.cgi" || return 1
   webui_repo_fetch "cgi-bin/meta.cgi" "$WEBUI_CGI/meta.cgi" || return 1
   webui_repo_fetch "cgi-bin/builder-meta.cgi" "$WEBUI_CGI/builder-meta.cgi" || return 1
-  webui_repo_fetch "cgi-bin/builder-candidates.cgi" "$WEBUI_CGI/builder-candidates.cgi" || return 1
-  webui_repo_fetch "cgi-bin/discovery-start.cgi" "$WEBUI_CGI/discovery-start.cgi" || return 1
-  webui_repo_fetch "cgi-bin/discovery-results.cgi" "$WEBUI_CGI/discovery-results.cgi" || return 1
-  webui_repo_fetch "cgi-bin/apply-candidate.cgi" "$WEBUI_CGI/apply-candidate.cgi" || return 1
-  webui_repo_fetch "cgi-bin/active-generated.cgi" "$WEBUI_CGI/active-generated.cgi" || return 1
+webui_repo_fetch "cgi-bin/builder-candidates.cgi" "$WEBUI_CGI/builder-candidates.cgi" || return 1
+webui_repo_fetch "cgi-bin/discovery-start.cgi" "$WEBUI_CGI/discovery-start.cgi" || return 1
+webui_repo_fetch "cgi-bin/discovery-results.cgi" "$WEBUI_CGI/discovery-results.cgi" || return 1
+webui_repo_fetch "cgi-bin/discovery-stop.cgi" "$WEBUI_CGI/discovery-stop.cgi" || return 1
+webui_repo_fetch "cgi-bin/apply-candidate.cgi" "$WEBUI_CGI/apply-candidate.cgi" || return 1
+webui_repo_fetch "cgi-bin/active-generated.cgi" "$WEBUI_CGI/active-generated.cgi" || return 1
 
   chmod +x "$WEBUI_RUNNER" "$WEBUI_CGI"/*.sh "$WEBUI_CGI"/*.cgi
   webui_fix_interpreters

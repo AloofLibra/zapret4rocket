@@ -43,6 +43,18 @@ function sl_fake(ctx, desync, args)
     return sl_invoke_builtin(ctx, desync, "fake", args)
 end
 
+function sl_tcpseg(ctx, desync, args)
+    return sl_invoke_builtin(ctx, desync, "tcpseg", args)
+end
+
+function sl_oob(ctx, desync, args)
+    return sl_invoke_builtin(ctx, desync, "oob", args)
+end
+
+function sl_syndata(ctx, desync, args)
+    return sl_invoke_builtin(ctx, desync, "syndata", args)
+end
+
 function sl_multisplit(ctx, desync, args)
     return sl_invoke_builtin(ctx, desync, "multisplit", args)
 end
@@ -78,6 +90,9 @@ end
 function sl_handlers()
     return {
         fake = sl_fake,
+        tcpseg = sl_tcpseg,
+        oob = sl_oob,
+        syndata = sl_syndata,
         multisplit = sl_multisplit,
         fakeddisorder = sl_fakeddisorder,
         fakedsplit = sl_fakedsplit,

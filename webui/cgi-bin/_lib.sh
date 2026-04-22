@@ -175,9 +175,18 @@ webui_builder_catalog_json() {
 }
 
 webui_builder_discovery_json() {
-  if type builder_last_session_json >/dev/null 2>&1 && [ -n "${PARAM_PROFILE:-}" ]; then
-    builder_last_session_json "$PARAM_PROFILE"
-    return
+  local runtime_file cache_file
+  if [ -n "${PARAM_PROFILE:-}" ]; then
+    runtime_file="$(webui_builder_discovery_runtime_file "$PARAM_PROFILE")"
+    if webui_builder_discovery_running "$PARAM_PROFILE" && [ -s "$runtime_file" ]; then
+      cat "$runtime_file"
+      return
+    fi
+    cache_file="$(webui_builder_last_session_cache_file "$PARAM_PROFILE")"
+    if [ -s "$cache_file" ]; then
+      cat "$cache_file"
+      return
+    fi
   fi
   local file
   file="$(webui_builder_discovery_file || true)"
@@ -254,6 +263,24 @@ webui_builder_discovery_state_runtime_file() {
   printf '%s/discovery-%s.state.json\n' "$WEBUI_BUILDER_DIR" "$profile"
 }
 
+webui_builder_candidates_cache_file() {
+  local profile="${1:-}"
+  mkdir -p "$WEBUI_BUILDER_DIR"
+  printf '%s/builder-candidates-%s.json\n' "$WEBUI_BUILDER_DIR" "$profile"
+}
+
+webui_builder_last_session_cache_file() {
+  local profile="${1:-}"
+  mkdir -p "$WEBUI_BUILDER_DIR"
+  printf '%s/last-session-%s.json\n' "$WEBUI_BUILDER_DIR" "$profile"
+}
+
+webui_builder_discovery_runtime_file() {
+  local profile="${1:-}"
+  mkdir -p "$WEBUI_BUILDER_DIR"
+  printf '%s/discovery-%s.runtime.json\n' "$WEBUI_BUILDER_DIR" "$profile"
+}
+
 webui_builder_discovery_running() {
   local profile="${1:-}" pid_file pid
   pid_file="$(webui_builder_discovery_pid_file "$profile")"
@@ -264,7 +291,7 @@ webui_builder_discovery_running() {
 }
 
 webui_start_builder_discovery_async() {
-  local profile="${1:-}" pid_file log_file state_file started_at finished_at
+  local profile="${1:-}" pid_file log_file state_file runtime_file started_at finished_at
   [[ "$profile" =~ ^[12]$ ]] || return 1
   if webui_builder_discovery_running "$profile"; then
     return 0
@@ -272,12 +299,37 @@ webui_start_builder_discovery_async() {
   pid_file="$(webui_builder_discovery_pid_file "$profile")"
   log_file="$(webui_builder_discovery_log_file "$profile")"
   state_file="$(webui_builder_discovery_state_runtime_file "$profile")"
+  runtime_file="$(webui_builder_discovery_runtime_file "$profile")"
   started_at="$(date +%Y-%m-%dT%H:%M:%S%z)"
+  rm -f "${runtime_file}.stop"
   cat > "$state_file" <<EOF
 {"running":true,"profile":$profile,"status":"running","message":"Discovery is running","started_at":"$started_at"}
 EOF
+  cat > "$runtime_file" <<EOF
+{"running":true,"profile":$profile,"status":"running","message":"Discovery is running","updated_at":"$started_at","phase":"queued","tier":"","checked":0,"total":0,"top_results":[]}
+EOF
   nohup bash -lc ". \"$BUILDER_MODULE\"; if builder_run_discovery \"$profile\"; then finished_at=\$(date +%Y-%m-%dT%H:%M:%S%z); printf '%s\n' \"{\\\"running\\\":false,\\\"profile\\\":$profile,\\\"status\\\":\\\"completed\\\",\\\"message\\\":\\\"Discovery completed\\\",\\\"finished_at\\\":\\\"\$finished_at\\\"}\" > \"$state_file\"; else finished_at=\$(date +%Y-%m-%dT%H:%M:%S%z); printf '%s\n' \"{\\\"running\\\":false,\\\"profile\\\":$profile,\\\"status\\\":\\\"failed\\\",\\\"message\\\":\\\"Discovery failed\\\",\\\"finished_at\\\":\\\"\$finished_at\\\"}\" > \"$state_file\"; fi; rm -f \"$pid_file\"" >"$log_file" 2>&1 &
   echo $! > "$pid_file"
+}
+
+webui_stop_builder_discovery() {
+  local profile="${1:-}" pid_file state_file runtime_file stopped_at pid
+  [[ "$profile" =~ ^[12]$ ]] || return 1
+  pid_file="$(webui_builder_discovery_pid_file "$profile")"
+  state_file="$(webui_builder_discovery_state_runtime_file "$profile")"
+  runtime_file="$(webui_builder_discovery_runtime_file "$profile")"
+  stopped_at="$(date +%Y-%m-%dT%H:%M:%S%z)"
+  : > "${runtime_file}.stop"
+  if [ -s "$pid_file" ]; then
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+    [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+  fi
+  cat > "$state_file" <<EOF
+{"running":false,"profile":$profile,"status":"stopped","message":"Discovery stopped","finished_at":"$stopped_at"}
+EOF
+  cat > "$runtime_file" <<EOF
+{"running":false,"profile":$profile,"status":"stopped","message":"Discovery stopped","updated_at":"$stopped_at","phase":"","tier":"","checked":0,"total":0,"top_results":[]}
+EOF
 }
 
 webui_write_builder_request() {
@@ -742,4 +794,25 @@ api_apply_candidate() {
   fi
   request_file="$(webui_write_builder_request "apply-candidate" "$profile" "$candidate")"
   send_json "200 OK" "{\"ok\":true,\"applied\":false,\"queued\":true,\"request_file\":\"$(json_escape "$request_file")\"}"
+}
+
+api_builder_candidates_cached() {
+  parse_params
+  [[ "${PARAM_PROFILE:-}" =~ ^[12]$ ]] || send_error "400 Bad Request" "Invalid builder profile"
+  local cache_file
+  cache_file="$(webui_builder_candidates_cache_file "$PARAM_PROFILE")"
+  if [ -s "$cache_file" ]; then
+    send_json "200 OK" "$(cat "$cache_file")"
+    return
+  fi
+  api_builder_candidates
+}
+
+api_discovery_stop() {
+  parse_params
+  local profile
+  profile="${PARAM_PROFILE:-}"
+  [[ "${profile:-}" =~ ^[12]$ ]] || send_error "400 Bad Request" "Invalid builder profile"
+  webui_stop_builder_discovery "$profile" || send_error "500 Internal Server Error" "Unable to stop discovery"
+  send_json "200 OK" "{\"ok\":true,\"stopped\":true,\"profile\":${profile}}"
 }

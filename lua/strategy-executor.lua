@@ -11,6 +11,26 @@ local function se_payload_key(desync)
     return desync.l7payload or desync.payload_type or desync.payload or nil
 end
 
+local function se_profile_mode(desync)
+    if type(ps_get_profile) ~= "function" then
+        return nil
+    end
+    local profile_id =
+        desync and (
+            desync.profile or
+            desync.profile_id or
+            desync.profileid or
+            desync.profile_num or
+            (desync.arg and (desync.arg.profile or desync.arg.key)) or
+            desync.func_instance
+        )
+    if not profile_id then
+        return nil
+    end
+    local profile = ps_get_profile(tostring(profile_id))
+    return type(profile) == "table" and profile.mode or nil
+end
+
 local function se_constraints_payload_match(desync, payload_map)
     if type(payload_map) ~= "table" then
         return true
@@ -49,6 +69,9 @@ end
 
 function se_execute_rescue(ctx, desync, rescue_id)
     if not rescue_id or type(policy_rescue) ~= "function" then
+        return VERDICT_PASS
+    end
+    if se_profile_mode(desync) == "validator_testing" then
         return VERDICT_PASS
     end
     se_log("using rescue " .. tostring(rescue_id))

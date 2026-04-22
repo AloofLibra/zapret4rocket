@@ -5,6 +5,7 @@ const state = {
   builderMeta: { profiles: [] },
   builderCandidates: {},
   builderDiscoveryState: {},
+  builderDiscoveryPayload: {},
 };
 
 const views = {
@@ -128,16 +129,109 @@ function builderDiscoveryState(profileId) {
   return state.builderDiscoveryState[profileId] || { running: false, status: 'idle', message: 'No active discovery' };
 }
 
+function builderDiscoveryPayload(profileId) {
+  return state.builderDiscoveryPayload[profileId] || { results: { top_results: [] } };
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function resultTone(result) {
+  switch (result) {
+    case 'valid':
+      return 'ok';
+    case 'unstable':
+      return 'warn';
+    default:
+      return 'bad';
+  }
+}
+
+function boolTone(value) {
+  return value ? 'ok' : 'bad';
+}
+
+function metricChip(label, value, tone = '') {
+  if (value === undefined || value === null || value === '') return '';
+  return `<span class="metric-chip ${tone}"><strong>${escapeHtml(label)}</strong>${escapeHtml(value)}</span>`;
+}
+
+function renderDiscoveryResult(item) {
+  const tone = resultTone(item.result);
+  const tls12Ok = Number(item.tls12_ok || 0) > 0;
+  const tls13Ok = Number(item.tls13_ok || 0) > 0;
+  const longGetOk = Number(item.long_get_ok || 0) > 0;
+  const transportOk = item.transport_ok === true || item.transport_ok === 'true';
+  const confidence = item.confidence ?? '';
+  const family = item.family || '';
+  const summaryChips = [
+    metricChip('result', `${item.result} / ${item.score}`, tone),
+    metricChip('elapsed', `${item.elapsed_ms} ms`),
+    metricChip('confidence', confidence, confidence >= 80 ? 'ok' : confidence >= 50 ? 'warn' : 'bad'),
+    metricChip('family', family),
+  ].filter(Boolean).join('');
+  const qualityChips = [
+    metricChip('failure', item.failure_class || 'n/a', item.failure_class === 'success' ? 'ok' : item.failure_class && item.failure_class !== 'inconclusive' ? 'warn' : ''),
+    metricChip('dns', item.dns_state || 'unknown', item.dns_state === 'ok' ? 'ok' : item.dns_state === 'fail' ? 'bad' : 'warn'),
+    metricChip('baseline', item.baseline_state || 'unknown', item.baseline_state === 'ok' ? 'ok' : item.baseline_state === 'fail' ? 'bad' : 'warn'),
+    metricChip('tls12', tls12Ok ? 'ok' : 'fail', boolTone(tls12Ok)),
+    metricChip('tls13', tls13Ok ? 'ok' : 'fail', boolTone(tls13Ok)),
+    metricChip('long_get', longGetOk ? 'ok' : 'fail', boolTone(longGetOk)),
+    metricChip('transport', transportOk ? 'ok' : 'fail', boolTone(transportOk)),
+  ].filter(Boolean).join('');
+
+  return `
+    <article class="check-item discovery-item">
+      <div class="check-title">
+        <strong>${escapeHtml(item.candidate)}</strong>
+        <span>${escapeHtml(item.label || '')}</span>
+      </div>
+      <div class="metric-row">${summaryChips}</div>
+      <div class="metric-row metric-row-secondary">${qualityChips}</div>
+    </article>
+  `;
+}
+
+function renderRecommendation(item) {
+  if (!item || !item.candidate) return '';
+  const tone = resultTone(item.result);
+  return `
+    <div class="builder-recommendation">
+      <div class="builder-recommendation-title">
+        <span>Recommended</span>
+        <strong>${escapeHtml(item.candidate)}</strong>
+      </div>
+      <div class="metric-row">
+        ${metricChip('label', item.label || '')}
+        ${metricChip('result', `${item.result} / ${item.score}`, tone)}
+        ${metricChip('confidence', item.confidence ?? '', (item.confidence ?? 0) >= 80 ? 'ok' : (item.confidence ?? 0) >= 50 ? 'warn' : 'bad')}
+        ${metricChip('failure', item.failure_class || 'n/a', item.failure_class === 'success' ? 'ok' : 'warn')}
+      </div>
+    </div>
+  `;
+}
+
 function ensureDiscoveryPolling() {
   const running = Object.values(state.builderDiscoveryState).some((item) => item && item.running);
   if (running && !ensureDiscoveryPolling.timer) {
     ensureDiscoveryPolling.timer = window.setInterval(() => {
-      refreshAll().catch(() => {});
-    }, 3000);
+      if (ensureDiscoveryPolling.pending) return;
+      ensureDiscoveryPolling.pending = true;
+      refreshAll().catch(() => {}).finally(() => {
+        ensureDiscoveryPolling.pending = false;
+      });
+    }, 6000);
   }
   if (!running && ensureDiscoveryPolling.timer) {
     window.clearInterval(ensureDiscoveryPolling.timer);
     ensureDiscoveryPolling.timer = null;
+    ensureDiscoveryPolling.pending = false;
   }
 }
 
@@ -152,6 +246,16 @@ function makeBuilderPanel(profile) {
   const activeText = info.active_candidate
     ? `${info.active_candidate} / strategy ${info.active_strategy || '0'}`
     : 'none';
+  const recommendation = payload.last_session && payload.last_session.recommended_candidate
+    ? payload.last_session.recommended_candidate
+    : null;
+  const results = (payload.last_session && payload.last_session.results) || [];
+  const discoveryPayload = builderDiscoveryPayload(profile.profile);
+  const liveProgress = discoveryPayload && discoveryPayload.results && discoveryPayload.results.top_results
+    ? discoveryPayload.results
+    : {};
+  const liveResults = Array.isArray(liveProgress.top_results) ? liveProgress.top_results : [];
+  const showingResults = discovery.running ? liveResults : results;
 
   panel.innerHTML = `
     <div class="panel-header">
@@ -166,7 +270,15 @@ function makeBuilderPanel(profile) {
         <span>Discovery</span>
         <strong class="builder-status builder-status-${discovery.status || 'idle'}">${discovery.message || discovery.status || 'idle'}</strong>
       </div>
+      ${discovery.running ? `
+      <div class="meta-line">
+        <span>Progress</span>
+        <strong>${liveProgress.phase || 'starting'}${liveProgress.tier ? ` / ${liveProgress.tier}` : ''} · ${liveProgress.checked || 0}/${liveProgress.total || 0}</strong>
+      </div>
+      <div class="progress-track"><span class="progress-fill" style="width:${liveProgress.total ? Math.max(6, Math.min(100, Math.round(((liveProgress.checked || 0) / liveProgress.total) * 100))) : 8}%"></span></div>
+      ` : ''}
     </div>
+    ${renderRecommendation(recommendation)}
   `;
 
   const actions = document.createElement('div');
@@ -195,6 +307,27 @@ function makeBuilderPanel(profile) {
     }
   });
   actions.appendChild(discoverButton);
+
+  if (discovery.running) {
+    const stopButton = document.createElement('button');
+    stopButton.type = 'button';
+    stopButton.className = 'ghost danger-button';
+    stopButton.textContent = 'Stop discovery';
+    stopButton.addEventListener('click', async () => {
+      try {
+        await api('/cgi-bin/discovery-stop.cgi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ profile: profile.profile }),
+        });
+        showBanner(`Discovery stopped for ${profile.label}.`, 'error');
+        await refreshAll();
+      } catch (error) {
+        showBanner(error.message, 'error');
+      }
+    });
+    actions.appendChild(stopButton);
+  }
 
   if (payload.candidates.length > 0) {
     const select = document.createElement('select');
@@ -233,22 +366,10 @@ function makeBuilderPanel(profile) {
 
   panel.appendChild(actions);
 
-  const results = (payload.last_session && payload.last_session.results) || [];
-  if (results.length > 0) {
+  if (showingResults.length > 0) {
     const list = document.createElement('div');
     list.className = 'checks';
-    list.innerHTML = results.slice(0, 3).map((item) => `
-      <article class="check-item">
-        <div class="check-title">
-          <strong>${item.candidate}</strong>
-          <span>${item.label}</span>
-        </div>
-        <div class="check-pair">
-          <span class="${item.result === 'fail' ? 'bad' : 'ok'}">${item.result} / score ${item.score}</span>
-          <span>elapsed ${item.elapsed_ms} ms</span>
-        </div>
-      </article>
-    `).join('');
+    list.innerHTML = showingResults.slice(0, 5).map(renderDiscoveryResult).join('');
     panel.appendChild(list);
   }
 
@@ -319,13 +440,14 @@ function renderStrategies() {
 }
 
 async function refreshAll() {
+  const discoveryRunning = Object.values(state.builderDiscoveryState).some((item) => item && item.running);
   const [meta, status, locks, builderMeta, builder1, builder2, discovery1, discovery2] = await Promise.all([
     api('/cgi-bin/meta.cgi'),
     api('/cgi-bin/status.cgi'),
     api('/cgi-bin/locks.cgi'),
     safeApi('/cgi-bin/builder-meta.cgi', {}, { profiles: [] }),
-    safeApi('/cgi-bin/builder-candidates.cgi?profile=1', {}, { profile: 1, candidates: [], last_session: { results: [] } }),
-    safeApi('/cgi-bin/builder-candidates.cgi?profile=2', {}, { profile: 2, candidates: [], last_session: { results: [] } }),
+    discoveryRunning ? Promise.resolve(state.builderCandidates[1] || { profile: 1, candidates: [], last_session: { results: [] } }) : safeApi('/cgi-bin/builder-candidates.cgi?profile=1', {}, { profile: 1, candidates: [], last_session: { results: [] } }),
+    discoveryRunning ? Promise.resolve(state.builderCandidates[2] || { profile: 2, candidates: [], last_session: { results: [] } }) : safeApi('/cgi-bin/builder-candidates.cgi?profile=2', {}, { profile: 2, candidates: [], last_session: { results: [] } }),
     safeApi('/cgi-bin/discovery-results.cgi?profile=1', {}, { discovery_state: { running: false, status: 'idle', message: 'No active discovery' } }),
     safeApi('/cgi-bin/discovery-results.cgi?profile=2', {}, { discovery_state: { running: false, status: 'idle', message: 'No active discovery' } }),
   ]);
@@ -341,6 +463,10 @@ async function refreshAll() {
   state.builderDiscoveryState = {
     1: (discovery1 && discovery1.discovery_state) || { running: false, status: 'idle', message: 'No active discovery' },
     2: (discovery2 && discovery2.discovery_state) || { running: false, status: 'idle', message: 'No active discovery' },
+  };
+  state.builderDiscoveryPayload = {
+    1: discovery1 || { results: { top_results: [] } },
+    2: discovery2 || { results: { top_results: [] } },
   };
   renderStatus();
   renderStrategies();

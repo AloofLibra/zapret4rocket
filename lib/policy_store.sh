@@ -42,7 +42,9 @@ policy_atomic_replace() {
         rm -f "$tmp"
         return 1
     }
+    chmod 0644 "$tmp" 2>/dev/null || true
     mv -f "$tmp" "$dst"
+    chmod 0644 "$dst" 2>/dev/null || true
 }
 
 policy_write_from_file() {
