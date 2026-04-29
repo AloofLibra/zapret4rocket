@@ -1380,7 +1380,7 @@ Enter (без цифр) - переустановка/обновление zapret
 '"${Fcyan}"'5.'"${yellow}"' Обновить стратегии, сбросить листы подбора стратегий и исключений (есть бэкап)
 '"${Fcyan}"'6.'"${yellow}"' Добавить домен в исключения
 '"${Fcyan}"'7.'"${yellow}"' Открыть в редакторе config (Установит nano редактор ~250kb)
-'"${Fcyan}"'8.'"${yellow}"' Преключатель скриптов bol-van обхода войсов DS,WA,TG на стандартные страты или возврат к скриптам. Сейчас: '"${plain}"'['"$(grep -Eq '^NFQWS_PORTS_UDP=.*443$' /opt/zapret2/config && echo "Скрипты" || (grep -Eq '443,1400,3478-3481,5349,50000-50099,19294-19344$' /opt/zapret2/config && echo "Классические стратегии" || echo "Незвестно"))"']'"${yellow}"'
+'"${Fcyan}"'8.'"${yellow}"' Переключатель 50-discord-media/50-stun4all и 6 блока конфига (#Стратегии для голосовой связи). Сейчас: '"${plain}"'['"$(grep -Eq '(^NFQWS2_PORTS_UDP=|,)50000-50099(,|[[:space:]]*$)' /opt/zapret2/config && echo "6 блок конфига" || echo "Скрипты bol-van")"']'"${yellow}"'
 '"${Fcyan}"'9.'"${yellow}"' Переключатель zapret2 на nftables/iptables (На всё жать Enter). Актуально для OpenWRT 21+. Может помочь с войсами. Сейчас: '"${plain}"'['"$(grep -q '^FWTYPE=iptables$' /opt/zapret2/config && echo "iptables" || (grep -q '^FWTYPE=nftables$' /opt/zapret2/config && echo "nftables" || echo "Неизвестно"))"']'"${yellow}"'
 '"${Fcyan}"'10.'"${yellow}"' (Де)активировать обход UDP на 1026-65531 портах (BF6, Fifa и т.п.). Сейчас: '"${plain}"'['"$(grep -q '^NFQWS_PORTS_UDP=443' /opt/zapret2/config && echo "Выключен" || (grep -q '^NFQWS_PORTS_UDP=1026-65531,443' /opt/zapret2/config && echo "Включен" || echo "Неизвестно"))"']'"${yellow}"'
 '"${Fcyan}"'11.'"${yellow}"' Управление аппаратным ускорением zapret2. Может увеличить скорость на роутере. Сейчас: '"${plain}"'['"$(grep '^FLOWOFFLOAD=' /opt/zapret2/config)"']'"${yellow}"'
@@ -1492,8 +1492,7 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "8")
-    echo -e "${yellow}Временно не работает${plain}"
-    # menu_action_toggle_bolvan_ports
+    menu_action_toggle_bolvan_ports
     pause_enter
     ;;
 

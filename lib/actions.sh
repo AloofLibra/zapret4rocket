@@ -80,32 +80,53 @@ menu_action_update_config_reset() {
 }
 
 menu_action_toggle_bolvan_ports() {
-  if grep -Eq '^NFQWS_PORTS_UDP=.*443$' "/opt/zapret2/config"; then
-    sed -i '76s/443$/443,1400,3478-3481,5349,50000-50099,19294-19344/' /opt/zapret2/config
-    sed -i 's/^--skip --filter-udp=50000/--filter-udp=50000/' "/opt/zapret2/config"
+  local cfg="/opt/zapret2/config"
+  local voice_ports_csv="50000-50099,1400,3478-3481,5349,19294-19344"
+  local voice_port current_ports new_ports p
+  local init_dir custom_dir
 
-    init_dir="$(dirname "$ZAPRET2_INIT")"
-    custom_dir="$init_dir/custom.d"
+  if [ ! -f "$cfg" ]; then
+    echo -e "${red}Не найден $cfg.${plain}"
+    return 1
+  fi
+
+  init_dir="$(dirname "$ZAPRET2_INIT")"
+  custom_dir="$init_dir/custom.d"
+  current_ports="$(sed -n 's/^NFQWS2_PORTS_UDP=//p' "$cfg" | head -n1)"
+
+  if ! printf "%s" "$current_ports" | grep -Eq '(^|,)50000-50099(,|$)'; then
+    if [ -n "$current_ports" ]; then
+      new_ports="$current_ports,$voice_ports_csv"
+    else
+      new_ports="443,$voice_ports_csv"
+    fi
+    sed -i "s/^NFQWS2_PORTS_UDP=.*/NFQWS2_PORTS_UDP=$new_ports/" "$cfg"
+    sed -i '/#Стратегии для голосовой связи/,/^[[:space:]]*--new[[:space:]]*$/ s/^--skip[[:space:]]\+--filter-udp=/--filter-udp=/' "$cfg"
+
     rm -f "$custom_dir/50-discord-media" \
           "$custom_dir/50-stun4all"
 
-    echo -e "${green}Уход от скриптов bol-van. Выделены порты 50000-50099,1400,3478-3481,5349 и раскомментированы стратегии DS, WA, TG${plain}"
+    echo -e "${green}Включён 6 блок конфига для голосовой связи. Скрипты bol-van отключены.${plain}"
 
-  elif grep -q '443,1400,3478-3481,5349,50000-50099,19294-19344$' "/opt/zapret2/config"; then
-    sed -i 's/443,1400,3478-3481,5349,50000-50099,19294-19344$/443/' /opt/zapret2/config
-    sed -i 's/^--filter-udp=50000/--skip --filter-udp=50000/' "/opt/zapret2/config"
+  elif printf "%s" "$current_ports" | grep -Eq '(^|,)50000-50099(,|$)'; then
+    new_ports=",$current_ports,"
+    for voice_port in 50000-50099 1400 3478-3481 5349 19294-19344; do
+      new_ports="$(printf "%s" "$new_ports" | sed "s/,$voice_port,/,/g")"
+    done
+    new_ports="$(printf "%s" "$new_ports" | sed 's/,,*/,/g; s/^,//; s/,$//')"
+    [ -n "$new_ports" ] || new_ports="443"
+    sed -i "s/^NFQWS2_PORTS_UDP=.*/NFQWS2_PORTS_UDP=$new_ports/" "$cfg"
+    sed -i '/#Стратегии для голосовой связи/,/^[[:space:]]*--new[[:space:]]*$/ s/^--filter-udp=/--skip --filter-udp=/' "$cfg"
 
-    init_dir="$(dirname "$ZAPRET2_INIT")"
-    custom_dir="$init_dir/custom.d"
     mkdir -p "$custom_dir"
     curl -L -o "$custom_dir/50-stun4all" \
       https://raw.githubusercontent.com/bol-van/zapret2/master/init.d/custom.d.examples.linux/50-stun4all
     curl -L -o "$custom_dir/50-discord-media" \
       https://raw.githubusercontent.com/bol-van/zapret2/master/init.d/custom.d.examples.linux/50-discord-media
 
-    echo -e "${green}Работа от скриптов bol-van. Вернули строку к виду NFQWS_PORTS_UDP=443 и добавили \"--skip \" в начале строк стратегии войса${plain}"
+    echo -e "${green}Включены скрипты bol-van 50-discord-media/50-stun4all. 6 блок конфига отключён через --skip.${plain}"
   else
-    echo -e "${yellow}Неизвестное состояние строки NFQWS_PORTS_UDP. Проверь конфиг вручную.${plain}"
+    echo -e "${yellow}Неизвестное состояние строки NFQWS2_PORTS_UDP. Проверь конфиг вручную.${plain}"
     return 0
   fi
 
