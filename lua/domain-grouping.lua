@@ -1,4 +1,4 @@
--- Domain grouping for circular orchestrator
+-- Domain grouping for circular strategy selection
 -- Groups subdomains under base domain to share strategy state
 
 -- Extract base domain (e.g., "rr5---sn-xxx.googlevideo.com" -> "googlevideo.com")

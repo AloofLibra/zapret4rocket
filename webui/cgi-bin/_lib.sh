@@ -10,7 +10,6 @@ ZAPRET_ROOT="/opt/zapret2"
 CONFIG_FILE="$ZAPRET_ROOT/config"
 CONFIG_DEFAULT_FILE="$ZAPRET_ROOT/config.default"
 ORCH_DIR="$ZAPRET_ROOT/extra_strats/cache/orchestra"
-ORCH_SCRIPT="$ORCH_DIR/orchestrator.sh"
 LIB_DIR=""
 
 find_runtime_libs() {
@@ -136,18 +135,17 @@ all_profiles_json() {
   printf ']'
 }
 
-sync_orchestra() {
-  if [ -x "$ORCH_SCRIPT" ]; then
-    "$ORCH_SCRIPT" sync >/dev/null 2>&1 || true
-  fi
-}
-
 restart_zapret2() {
   set_zapret2_init
   [ -f "$ZAPRET2_INIT" ] || return 1
   "$ZAPRET2_INIT" restart >/dev/null 2>&1
-  if [ -x "$ORCH_SCRIPT" ] && [ -f "$ORCH_DIR/enabled" ]; then
-    "$ORCH_SCRIPT" start >/dev/null 2>&1 || true
+}
+
+strategy_locks_status_text() {
+  if [ -s "$ORCH_DIR/locked.tsv" ] || [ -s "$ORCH_DIR/locked.manual.tsv" ]; then
+    echo "Есть"
+  else
+    echo "Нет"
   fi
 }
 
@@ -192,7 +190,7 @@ api_status() {
   local running
   if zapret2_running; then running=true; else running=false; fi
   send_json "200 OK" "$(cat <<EOF
-{"zapret2_running":$running,"orchestra_status":"$(json_escape "$(orchestra_status_text)")","hostlist_mode":"$(json_escape "$(hostlist_mode_text)")","fwtype":"$(json_escape "$(fwtype_text)")","flowoffload":"$(json_escape "$(flowoffload_text)")","tls_blob_mode":"$(json_escape "$(tls_blob_menu_text)")","profiles":$(all_profiles_json)}
+{"zapret2_running":$running,"strategy_locks_status":"$(json_escape "$(strategy_locks_status_text)")","hostlist_mode":"$(json_escape "$(hostlist_mode_text)")","fwtype":"$(json_escape "$(fwtype_text)")","flowoffload":"$(json_escape "$(flowoffload_text)")","tls_blob_mode":"$(json_escape "$(tls_blob_menu_text)")","profiles":$(all_profiles_json)}
 EOF
 )"
 }
@@ -211,7 +209,6 @@ api_set_lock() {
   proto="$(profile_proto "$PARAM_PROFILE")"
   [ -n "$proto" ] || send_error "400 Bad Request" "Не удалось определить протокол профиля"
   orch_locked_set "$PARAM_PROFILE" "$proto" "$PARAM_STRATEGY"
-  sync_orchestra
   send_json "200 OK" "{\"ok\":true}"
 }
 
@@ -222,7 +219,6 @@ api_clear_lock() {
   proto="$(profile_proto "$PARAM_PROFILE")"
   [ -n "$proto" ] || send_error "400 Bad Request" "Не удалось определить протокол профиля"
   orch_locked_clear "$PARAM_PROFILE" "$proto"
-  sync_orchestra
   send_json "200 OK" "{\"ok\":true}"
 }
 

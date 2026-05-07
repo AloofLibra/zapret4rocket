@@ -86,9 +86,6 @@ orch_profile_try() {
         for p in $proto_list; do
             orch_locked_set "$profile" "$p" "$s"
         done
-        if [ -x "$ORCH_SCRIPT" ]; then
-            "$ORCH_SCRIPT" sync
-        fi
         echo "Стратегия $s применена."
         if [ "$test_url" = "__RUN_CDN_TEST__" ]; then
             echo "Проверка доступа: CDN test (как в пункте 001)"
@@ -119,9 +116,6 @@ orch_profile_try() {
             orch_locked_clear "$profile" "$p"
         fi
     done
-    if [ -x "$ORCH_SCRIPT" ]; then
-        "$ORCH_SCRIPT" sync
-    fi
     echo "Изменения отменены."
     pause_enter
 }
@@ -235,9 +229,6 @@ manage_custom_rkn_domain() {
 
     for ((s=strategy_num; s<=max_strat; s++)); do
         orch_locked_set "$user_domain" "tls" "$s"
-        if [ -x "$ORCH_SCRIPT" ]; then
-            "$ORCH_SCRIPT" sync
-        fi
 
         echo "Стратегия $s применена для домена $user_domain"
         check_access "$test_url"
@@ -256,9 +247,6 @@ manage_custom_rkn_domain() {
         orch_locked_set "$user_domain" "tls" "$prev_strat"
     else
         orch_locked_clear "$user_domain" "tls"
-    fi
-    if [ -x "$ORCH_SCRIPT" ]; then
-        "$ORCH_SCRIPT" sync
     fi
     echo "Изменения по стратегии для домена отменены."
     pause_enter

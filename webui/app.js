@@ -56,7 +56,7 @@ function renderStatus() {
 
   const cards = [
     ['zapret2', state.status.zapret2_running ? 'Запущен' : 'Остановлен'],
-    ['Оркестратор', state.status.orchestra_status],
+    ['Локи стратегий', state.status.strategy_locks_status],
     ['Фильтр', state.status.hostlist_mode],
     ['FW', state.status.fwtype],
     ['Offload', state.status.flowoffload],

@@ -14,7 +14,7 @@ This repository is a shell-based installer and management wrapper around `zapret
 
 Primary entrypoint:
 
-- `z2r.sh`: main script for install, update, environment detection, config deployment, menu actions, and orchestrator lifecycle.
+- `z2r.sh`: main script for install, update, environment detection, config deployment, menu actions, and strategy lock lifecycle.
 
 Secondary helper scripts:
 
@@ -42,7 +42,7 @@ Normal flow:
 2. It installs or refreshes upstream `zapret2`.
 3. It deploys this repository's assets into `/opt/zapret2`.
 4. It installs the custom config, extra strategy files, lists, fake payloads, Lua scripts, and orchestra state files.
-5. It manages `zapret2` and the strategy orchestrator through an interactive menu.
+5. It manages `zapret2` and manual strategy locks through an interactive menu.
 
 ## Layout
 
@@ -61,8 +61,7 @@ Normal flow:
 - `fake/`: fake payload binaries, now including `custom_tls.bin`.
 - `extra_strats/`: numbered strategy slots and special lists used by config and menu logic.
 - `extra_strats/TCP/RKN/Discord.txt`: dedicated Discord-related list used by config and blob toggles.
-- `orchestra/orchestrator.sh`: shell daemon that watches logs and maintains orchestration state under `/opt/zapret2/extra_strats/cache/orchestra`.
-- `orchestra/locked.lua`: Lua lock adapter used by the config and orchestrator state.
+- `orchestra/locked.lua`: Lua lock adapter used by the config and manual lock state.
 - `lua/strategy-lock-manager.lua`: centralized lock/block state and hostname normalization.
 - `lua/combined-detector.lua`: combined quality/failure logic that uses orchestration state.
 - `lua/domain-grouping.lua`: grouping logic for related domains.
@@ -73,8 +72,8 @@ Normal flow:
 
 The project now has two interacting layers:
 
-- Shell/menu layer: deploys files, edits config, starts/stops services, and manually assigns strategies.
-- Lua/orchestra layer: decides, tracks, groups, and locks strategies at runtime.
+- Shell/menu layer: deploys files, edits config, starts/stops services, and writes manual strategy locks.
+- Lua lock layer: applies manual strategy locks at runtime.
 
 Important practical consequence:
 
@@ -87,7 +86,7 @@ Important practical consequence:
 - `lib/actions.sh` uses targeted `sed`/`awk` replacements against `/opt/zapret2/config`. Small wording changes in config blocks can silently break toggles.
 - `lib/strategies.sh` derives max strategy counts from config content. If profile structure changes, strategy menus can go out of sync.
 - `z2r.sh` performs destructive operations on target machines, including removing or rebuilding `/opt/zapret2`.
-- `orchestra/orchestrator.sh` assumes specific log patterns and state file locations. Renaming emitted messages or moving paths can break learning/locking.
+- Strategy lock files under `/opt/zapret2/extra_strats/cache/orchestra` are read by Lua at runtime. Moving paths can break manual strategy locking.
 - `lua/strategy-lock-manager.lua` is a shared source of truth for hostname normalization and lock/block state. Duplicating normalization elsewhere is likely to cause subtle bugs.
 
 ## Editing Guidelines
@@ -118,7 +117,7 @@ For strategy selection or status issues:
 
 - `lib/strategies.sh`
 - `config.default`
-- `orchestra/orchestrator.sh`
+- `orchestra/locked.lua`
 
 For runtime adaptive behavior or locking bugs:
 

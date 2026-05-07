@@ -57,3 +57,4 @@ check_access_list() {
    echo "Проверка доступности www.instagram.com (RKN list + нужен рабочий DNS)"
    check_access "https://www.instagram.com/"
 }
+

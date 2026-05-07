@@ -322,3 +322,29 @@ menu_action_set_tls_blob() {
   pause_enter
   return 0
 }
+
+toggle_hostlist_mode() {
+  for cfg in /opt/zapret2/config /opt/zapret2/config.default; do
+    [ -f "$cfg" ] || continue
+    if grep -q '^MODE_FILTER=autohostlist' "$cfg"; then
+      sed -i 's/^MODE_FILTER=autohostlist/MODE_FILTER=hostlist/' "$cfg"
+      # Disable <HOSTLIST> placeholder for RKN strategy only
+      sed -i 's#\(--hostlist=/opt/zapret2/extra_strats/TCP_RKN_list\.txt\) <HOSTLIST>#\1#g' "$cfg"
+    elif grep -q '^MODE_FILTER=hostlist' "$cfg"; then
+      sed -i 's/^MODE_FILTER=hostlist/MODE_FILTER=autohostlist/' "$cfg"
+      # Enable <HOSTLIST> placeholder for RKN strategy only
+      sed -i 's#\(--hostlist=/opt/zapret2/extra_strats/TCP_RKN_list\.txt\)#\1 <HOSTLIST>#g' "$cfg"
+    fi
+  done
+}
+
+toggle_fallback_mode() {
+  for cfg in /opt/zapret2/config /opt/zapret2/config.default; do
+    [ -f "$cfg" ] || continue
+    if sed -n '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/p' "$cfg" | grep -q '^[[:space:]]*--skip[[:space:]]'; then
+      sed -i '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/ s/^[[:space:]]*--skip[[:space:]]\+//' "$cfg"
+    else
+      sed -i '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/ s/^[[:space:]]*--filter-tcp=443 --filter-l7=tls/--skip --filter-tcp=443 --filter-l7=tls/' "$cfg"
+    fi
+  done
+}

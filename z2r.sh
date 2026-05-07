@@ -74,7 +74,7 @@ source "$SCRIPT_DIR/zapret2/z2r_lib/telemetry.sh"
 # Общий API для чтения и правки /opt/zapret2/config
 source "$SCRIPT_DIR/zapret2/z2r_lib/config.sh"
 
-# Общий API состояния оркестратора/ручных локов
+# Общий API ручных локов стратегий
 source "$SCRIPT_DIR/zapret2/z2r_lib/orchestra_state.sh"
 
 # База подсказок по стратегиям (скачивание + вывод подсказки по провайдеру)
@@ -177,86 +177,42 @@ set_zapret2_init() {
 }
 
 ORCH_DIR="/opt/zapret2/extra_strats/cache/orchestra"
-ORCH_SCRIPT="$ORCH_DIR/orchestrator.sh"
-ORCH_ENABLED_FLAG="$ORCH_DIR/enabled"
 ORCH_LUA_LOCKED="/opt/zapret2/lua/locked.lua"
 
-orchestra_update_from_repo() {
-  local url="https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/orchestra/orchestrator.sh"
+locked_lua_update_from_repo() {
   local locked_url="https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/orchestra/locked.lua"
-  local tmp="${ORCH_SCRIPT}.tmp"
+  local tmp="${ORCH_LUA_LOCKED}.tmp"
 
-  mkdir -p "$ORCH_DIR"
+  mkdir -p "$ORCH_DIR" "$(dirname "$ORCH_LUA_LOCKED")"
   if command -v curl >/dev/null 2>&1; then
-    if ! curl -fsSL -o "$tmp" "$url"; then
-      echo -e "${red}Не удалось скачать оркестратор (curl).${plain}"
-      return 1
-    fi
-    if ! curl -fsSL -o "$ORCH_LUA_LOCKED" "$locked_url"; then
+    if ! curl -fsSL -o "$tmp" "$locked_url"; then
       echo -e "${red}Не удалось скачать locked.lua (curl).${plain}"
       return 1
     fi
   elif command -v wget >/dev/null 2>&1; then
-    if ! wget -qO "$tmp" "$url"; then
-      echo -e "${red}Не удалось скачать оркестратор (wget).${plain}"
-      return 1
-    fi
-    if ! wget -qO "$ORCH_LUA_LOCKED" "$locked_url"; then
+    if ! wget -qO "$tmp" "$locked_url"; then
       echo -e "${red}Не удалось скачать locked.lua (wget).${plain}"
       return 1
     fi
   else
-    echo -e "${red}Нет curl или wget для обновления оркестратора.${plain}"
+    echo -e "${red}Нет curl или wget для обновления locked.lua.${plain}"
     return 1
   fi
 
-  mv "$tmp" "$ORCH_SCRIPT"
-  chmod +x "$ORCH_SCRIPT"
-  echo -e "${green}Оркестратор обновлен из репозитория.${plain}"
+  mv "$tmp" "$ORCH_LUA_LOCKED"
+  echo -e "${green}locked.lua обновлен из репозитория.${plain}"
 }
 
-# Проверяем оркестратор и locked.lua, при отсутствии пробуем скачать из репозитория
+# Проверяем locked.lua, при отсутствии пробуем скачать из репозитория
 if [ -f /opt/zapret2/config ]; then
-  if [ ! -s "$ORCH_SCRIPT" ] || [ ! -s "$ORCH_LUA_LOCKED" ]; then
-    echo "Не найдены orchestrator.sh или locked.lua. Пытаюсь скачать из репозитория..."
-    orchestra_update_from_repo || true
+  if [ ! -s "$ORCH_LUA_LOCKED" ]; then
+    echo "Не найден locked.lua. Пытаюсь скачать из репозитория..."
+    locked_lua_update_from_repo || true
   fi
 fi
 
-orchestra_start() {
-  touch "$ORCH_ENABLED_FLAG"
-  if [ ! -x "$ORCH_SCRIPT" ]; then
-    orchestra_update_from_repo || true
-  fi
-  if [ -x "$ORCH_SCRIPT" ]; then
-    "$ORCH_SCRIPT" start
-  fi
-}
-
-orchestra_stop() {
-  if [ -x "$ORCH_SCRIPT" ]; then
-    "$ORCH_SCRIPT" stop
-  fi
-  rm -f "$ORCH_ENABLED_FLAG"
-}
-
 hostlist_mode_text() {
   config_hostlist_mode_text "$@"
-}
-
-toggle_hostlist_mode() {
-  for cfg in /opt/zapret2/config /opt/zapret2/config.default; do
-    [ -f "$cfg" ] || continue
-    if grep -q '^MODE_FILTER=autohostlist' "$cfg"; then
-      sed -i 's/^MODE_FILTER=autohostlist/MODE_FILTER=hostlist/' "$cfg"
-      # Disable <HOSTLIST> placeholder for RKN strategy only
-      sed -i 's#\(--hostlist=/opt/zapret2/extra_strats/TCP_RKN_list\.txt\) <HOSTLIST>#\1#g' "$cfg"
-    elif grep -q '^MODE_FILTER=hostlist' "$cfg"; then
-      sed -i 's/^MODE_FILTER=hostlist/MODE_FILTER=autohostlist/' "$cfg"
-      # Enable <HOSTLIST> placeholder for RKN strategy only
-      sed -i 's#\(--hostlist=/opt/zapret2/extra_strats/TCP_RKN_list\.txt\)#\1 <HOSTLIST>#g' "$cfg"
-    fi
-  done
 }
 
 fallback_mode_text() {
@@ -298,17 +254,6 @@ voice_mode_text() {
   echo "неизвестно"
 }
 
-toggle_fallback_mode() {
-  for cfg in /opt/zapret2/config /opt/zapret2/config.default; do
-    [ -f "$cfg" ] || continue
-    if sed -n '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/p' "$cfg" | grep -q '^[[:space:]]*--skip[[:space:]]'; then
-      sed -i '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/ s/^[[:space:]]*--skip[[:space:]]\+//' "$cfg"
-    else
-      sed -i '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/ s/^[[:space:]]*--filter-tcp=443 --filter-l7=tls/--skip --filter-tcp=443 --filter-l7=tls/' "$cfg"
-    fi
-  done
-}
-
 fallback_strategy_text() {
   local file="/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
   if [ -f "$file" ]; then
@@ -347,10 +292,10 @@ set_fallback_strategy() {
 }
 
 fallback_profile_try() {
-  local prev_lock_file="${orch_lock_file:-/opt/zapret2/extra_strats/cache/orchestra/locked.tsv}"
-  orch_lock_file="/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
+  local prev_lock_file="${ORCH_LOCK_FILE:-/opt/zapret2/extra_strats/cache/orchestra/locked.tsv}"
+  ORCH_LOCK_FILE="/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
   orch_profile_try "8" "Профиль 8: fallback (безразборный блок)" "tls" "__RUN_CDN_TEST__"
-  orch_lock_file="$prev_lock_file"
+  ORCH_LOCK_FILE="$prev_lock_file"
 }
 
 tls_blob_menu_text() {
@@ -648,7 +593,7 @@ get_repo() {
   mkdir -p /opt/zapret2/lists /opt/zapret2/extra_strats /opt/zapret2/extra_strats/cache
   mkdir -p /opt/zapret2/extra_strats/cache/orchestra
   chmod 777 /opt/zapret2/extra_strats/cache/orchestra 2>/dev/null || true
-  orchestra_update_from_repo || true
+  locked_lua_update_from_repo || true
   for listfile in cloudflare-ipset.txt cloudflare-ipset_v6.txt netrogat.txt russia-discord.txt russia-youtube-rtmps.txt russia-youtube.txt russia-youtubeQ.txt tg_cidr.txt; do
     curl -L -o /opt/zapret2/lists/$listfile https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z4r/lists/$listfile
   done
@@ -875,99 +820,6 @@ get_panel() {
  else
      echo "Пропуск установки ПО туннелирования."
  fi
-}
-
-#webssh ttyd
-ttyd_webssh() {
- echo -e $'\033[33mВведите логин для доступа к zeefeer через браузер (0 - отказ от логина через web в z2r и переход на логин в ssh (может помочь в safari). Enter - пустой логин, \033[31mно не рекомендуется, панель может быть доступна из интернета!)\033[0m'
- read -re -p '' ttyd_login
- echo -e "${yellow}Если вы открыли пункт через браузер - вас выкинет. Используйте SSH для установки${plain}"
- 
- ttyd_login_have="-c "${ttyd_login}": bash z2r"
- if [[ "$ttyd_login" == "0" ]]; then
-	echo "Отключение логина в веб. Перевод с z2r на CLI логин."
-    ttyd_login_have="login"
- fi
- 
- if [[ "$OSystem" == "VPS" ]]; then
-	echo -e "${yellow}Установка ttyd for VPS${plain}"
-	systemctl stop ttyd 2>/dev/null || true
-	curl -L -o /usr/bin/ttyd https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.x86_64
-	chmod +x /usr/bin/ttyd
-	
-	cat > /etc/systemd/system/ttyd.service <<EOF
-[Unit]
-Description=ttyd WebSSH Service
-After=network.target
-
-[Service]
-ExecStart=/usr/bin/ttyd -p 17681 -W -a ${ttyd_login_have}
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-	systemctl daemon-reload
-	systemctl enable ttyd
-	systemctl start ttyd
- elif [[ "$OSystem" == "WRT" ]]; then
-	echo -e "${yellow}Установка ttyd for WRT${plain}"
-	/etc/init.d/ttyd stop 2>/dev/null || true
-	opkg install ttyd 2>/dev/null || apk add ttyd 2>/dev/null
-    uci set ttyd.@ttyd[0].interface=''
-    uci set ttyd.@ttyd[0].command="-p 17681 -W -a ${ttyd_login_have}"
-	uci commit ttyd
-	/etc/init.d/ttyd enable
-	/etc/init.d/ttyd start
- elif [[ "$OSystem" == "entware" ]]; then
-	echo -e "${yellow}Установка ttyd for Entware${plain}"
-	/opt/etc/init.d/S99ttyd stop 2>/dev/null || true
-	opkg install ttyd 2>/dev/null || apk add ttyd 2>/dev/null
-	
-	cat > /opt/etc/init.d/S99ttyd <<EOF
-#!/bin/sh
-
-START=99
-
-case "\$1" in
-  start)
-    echo "Starting ttyd..."
-    ttyd -p 17681 -W -a ${ttyd_login_have} &
-    ;;
-  stop)
-    echo "Stopping ttyd..."
-    killall ttyd
-    ;;
-  restart)
-    \$0 stop
-    sleep 1
-    \$0 start
-    ;;
-  *)
-    echo "Usage: \$0 {start|stop|restart}"
-    exit 1
-    ;;
-esac
-EOF
-
-  chmod +x /opt/etc/init.d/S99ttyd
-  /opt/etc/init.d/S99ttyd start
-  sleep 1
-  if netstat -tuln | grep -q ':17681'; then
-	echo -e "${green}Порт 17681 для службы ttyd слушается${plain}"
-  else
-	echo -e "${red}Порт 17681 для службы ttyd не прослушивается${plain}"
-  fi
- fi
-
- if pidof ttyd >/dev/null; then
-	echo -e "Проверка...${green}Служба ttyd запущена.${plain}"
- else
-	echo -e "Проверка...${red}Служба ttyd не запущена! Если у вас Entware, то после перезагрузки роутера служба скорее всего заработает!${plain}"
- fi
- echo -e "${plain}Выполнение установки завершено. ${green}Доступ по ip вашего роутера/VPS в формате ip:17681, например 192.168.1.1:17681 или mydomain.com:17681 ${yellow}логин: ${ttyd_login} пароль - не испольузется.${plain} Был выполнен выход из скрипта для сохранения состояния."
 }
 
 #Меню, проверка состояний и вывод с чтением ответа
@@ -1330,7 +1182,7 @@ Enter (без цифр) - переустановка/обновление zapret
 '"${Fcyan}"'001.'"${yellow}"' CDN тест (test.sh)
 '"${Fcyan}"'01.'"${yellow}"' Проверить доступность сервисов (Тест не точен)
 '"${Fcyan}"'1.'"${yellow}"' Фиксация стратегии профиля/безразборного блока. Текущие: '"${plain}"'[ '"${strategies_status}"' ]'"${yellow}"' (fallback: '"${plain}"'['"$(fallback_strategy_text)"']'"${yellow}"')
-'"${Fcyan}"'2.'"${yellow}"' Стоп/пере(запуск) zapret2 (сейчас: '"$(pidof nfqws2 >/dev/null && echo "${green}Запущен${yellow}" || echo "${red}Остановлен${yellow}")"' | оркестратор: '"${plain}"'['"$(orchestra_status_text)"']'"${yellow}"')
+'"${Fcyan}"'2.'"${yellow}"' Стоп/пере(запуск) zapret2 (сейчас: '"$(pidof nfqws2 >/dev/null && echo "${green}Запущен${yellow}" || echo "${red}Остановлен${yellow}")"')
 '"${Fcyan}"'3.'"${yellow}"' Запуск blockcheck2 и сохранение SUMMARY
 '"${Fcyan}"'4.'"${yellow}"' Удалить zapret2
 '"${Fcyan}"'5.'"${yellow}"' Обновить стратегии, сбросить листы подбора стратегий и исключений (есть бэкап)
@@ -1387,11 +1239,9 @@ Enter (без цифр) - переустановка/обновление zapret
   "2")
     if pidof nfqws2 >/dev/null; then
       ensure_nfqws2_stopped
-      orchestra_stop
       echo -e "${green}Выполнена команда остановки zapret2${plain}"
     else
       "$ZAPRET2_INIT" restart
-      orchestra_start
       echo -e "${green}Выполнена команда перезапуска zapret2${plain}"
     fi
     pause_enter
@@ -1409,15 +1259,9 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "5")
-    orchestra_update_from_repo
+    locked_lua_update_from_repo
     mkdir -p /opt/zapret2/extra_strats/cache/orchestra
     chmod 777 /opt/zapret2/extra_strats/cache/orchestra 2>/dev/null || true
-    if [ -x "$ORCH_SCRIPT" ]; then
-      if ps w | grep -F "$ORCH_SCRIPT run" | grep -v grep >/dev/null 2>&1; then
-        orchestra_stop
-        orchestra_start
-      fi
-    fi
     menu_action_update_config_reset
     pause_enter
     ;;
@@ -1473,7 +1317,6 @@ Enter (без цифр) - переустановка/обновление zapret
     toggle_hostlist_mode
     if pidof nfqws2 >/dev/null; then
       "$ZAPRET2_INIT" restart
-      orchestra_start
       echo -e "${green}zapret2 перезапущен для применения режима${plain}"
     fi
     pause_enter
@@ -1483,7 +1326,6 @@ Enter (без цифр) - переустановка/обновление zapret
     toggle_fallback_mode
     if pidof nfqws2 >/dev/null; then
       "$ZAPRET2_INIT" restart
-      orchestra_start
       echo -e "${green}zapret2 перезапущен для применения режима${plain}"
     fi
     pause_enter
@@ -1612,12 +1454,12 @@ zapret_get
 
 #Создаём папки и забираем файлы папок lists, fake, extra_strats, копируем конфиг, скрипты для войсов DS, WA, TG
 get_repo
-if [ ! -s "$ORCH_SCRIPT" ] || [ ! -s "$ORCH_LUA_LOCKED" ]; then
-  echo "Повторная попытка загрузки orchestrator.sh и locked.lua..."
-  if orchestra_update_from_repo; then
-    echo -e "${green}Повторная загрузка orchestrator.sh и locked.lua успешна.${plain}"
+if [ ! -s "$ORCH_LUA_LOCKED" ]; then
+  echo "Повторная попытка загрузки locked.lua..."
+  if locked_lua_update_from_repo; then
+    echo -e "${green}Повторная загрузка locked.lua успешна.${plain}"
   else
-    echo -e "${red}Повторная загрузка orchestrator.sh и locked.lua не удалась.${plain}"
+    echo -e "${red}Повторная загрузка locked.lua не удалась.${plain}"
   fi
 fi
 

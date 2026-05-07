@@ -933,7 +933,7 @@ function udp_protocol_success_detector(desync, crec)
     return false
 end
 
--- ==================== Quality-Based Circular Orchestrator ====================
+-- ==================== Quality-Based Circular Strategy Selection ====================
 -- Uses strategy-lock-manager.lua for quality tracking and locking
 -- slm_* functions handle: normalize, record, get_best, should_lock, get_locked, reset, get_stats
 -- Alternative to standard circular that tracks success per strategy
