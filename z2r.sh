@@ -657,7 +657,6 @@ get_repo() {
   z2r_download_project_file /opt/zapret2/extra_strats/UDP_YT_list.txt "extra_strats/UDP/YT/List.txt" || return 1
   z2r_download_project_file /opt/zapret2/extra_strats/TCP_RKN_list.txt "extra_strats/TCP/RKN/List.txt" || return 1
   z2r_download_project_file /opt/zapret2/extra_strats/TCP_YT_list.txt "extra_strats/TCP/YT/List.txt" || return 1
-  z2r_download_project_file /opt/zapret2/extra_strats/TCP_GV_list.txt "extra_strats/TCP/GV/List.txt" || return 1
   z2r_download_project_file /opt/zapret2/extra_strats/TCP_Discord.txt "extra_strats/TCP/RKN/Discord.txt" || return 1
   if [ ! -f /opt/zapret2/files/fake/custom_tls.bin ]; then
     mkdir -p /opt/zapret2/files/fake
