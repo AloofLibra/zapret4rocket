@@ -67,7 +67,7 @@ z2r_download_project_file() {
     mv -f "$tmp" "$dest"
     return 0
   fi
-  echo -e "${yellow}GitHub недоступен для $rel. Пробую зеркало.${plain}"
+  echo -e "${yellow}GitHub недоступен для $rel. Пробую зеркало.${plain}" >&2
   rm -f "$tmp"
   if z2r_fetch_url_to_file "$tmp" "$mirror"; then
     mv -f "$tmp" "$dest"
@@ -646,6 +646,8 @@ run_cdn_test() {
 
 #Создаём папки и забираем файлы папок lists, fake, extra_strats, копируем конфиг, скрипты для войсов DS, WA, TG
 get_repo() {
+  local fake_archive="/tmp/z2r_fake_files_$$.tar.gz"
+
   mkdir -p /opt/zapret2/lists /opt/zapret2/extra_strats /opt/zapret2/extra_strats/cache
   mkdir -p /opt/zapret2/extra_strats/cache/orchestra
   chmod 777 /opt/zapret2/extra_strats/cache/orchestra 2>/dev/null || true
@@ -653,7 +655,12 @@ get_repo() {
   for listfile in cloudflare-ipset.txt cloudflare-ipset_v6.txt netrogat.txt russia-discord.txt russia-youtube-rtmps.txt russia-youtube.txt russia-youtubeQ.txt tg_cidr.txt; do
     z2r_download_project_file "/opt/zapret2/lists/$listfile" "lists/$listfile" || return 1
   done
-  z2r_download_project_stdout "fake_files.tar.gz" | tar -xz -C /opt/zapret2/files/fake
+  z2r_download_project_file "$fake_archive" "fake_files.tar.gz" || return 1
+  tar -xzf "$fake_archive" -C /opt/zapret2/files/fake || {
+    rm -f "$fake_archive"
+    return 1
+  }
+  rm -f "$fake_archive"
   z2r_download_project_file /opt/zapret2/extra_strats/UDP_YT_list.txt "extra_strats/UDP/YT/List.txt" || return 1
   z2r_download_project_file /opt/zapret2/extra_strats/TCP_RKN_list.txt "extra_strats/TCP/RKN/List.txt" || return 1
   z2r_download_project_file /opt/zapret2/extra_strats/TCP_YT_list.txt "extra_strats/TCP/YT/List.txt" || return 1
