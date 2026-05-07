@@ -645,6 +645,22 @@ run_cdn_test() {
 }
 
 #Создаём папки и забираем файлы папок lists, fake, extra_strats, копируем конфиг, скрипты для войсов DS, WA, TG
+z2r_install_bolvan_voice_scripts() {
+  local custom_dir="$1"
+  local examples_dir="/opt/zapret2/init.d/custom.d.examples.linux"
+  local script
+
+  mkdir -p "$custom_dir"
+  for script in 50-stun4all 50-discord-media; do
+    if [ ! -f "$examples_dir/$script" ]; then
+      echo -e "${red}Не найден $examples_dir/$script.${plain}"
+      return 1
+    fi
+    cp -f "$examples_dir/$script" "$custom_dir/$script" || return 1
+    chmod +x "$custom_dir/$script" 2>/dev/null || true
+  done
+}
+
 get_repo() {
   local fake_archive="/tmp/z2r_fake_files_$$.tar.gz"
 
@@ -688,9 +704,7 @@ get_repo() {
   fi
   init_dir="$(dirname "$ZAPRET2_INIT")"
   custom_dir="$init_dir/custom.d"
-  mkdir -p "$custom_dir"
-  curl -L -o "$custom_dir/50-stun4all" https://raw.githubusercontent.com/bol-van/zapret2/master/init.d/custom.d.examples.linux/50-stun4all
-  curl -L -o "$custom_dir/50-discord-media" https://raw.githubusercontent.com/bol-van/zapret2/master/init.d/custom.d.examples.linux/50-discord-media
+  z2r_install_bolvan_voice_scripts "$custom_dir" || return 1
 
 # cache
 mkdir -p /opt/zapret2/extra_strats/cache

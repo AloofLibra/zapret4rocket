@@ -112,11 +112,7 @@ menu_action_toggle_bolvan_ports() {
     sed -i "s/^NFQWS2_PORTS_UDP=.*/NFQWS2_PORTS_UDP=$new_ports/" "$cfg"
     sed -i '/#Стратегии для голосовой связи/,/^[[:space:]]*--new[[:space:]]*$/ s/^--filter-udp=/--skip --filter-udp=/' "$cfg"
 
-    mkdir -p "$custom_dir"
-    curl -L -o "$custom_dir/50-stun4all" \
-      https://raw.githubusercontent.com/bol-van/zapret2/master/init.d/custom.d.examples.linux/50-stun4all
-    curl -L -o "$custom_dir/50-discord-media" \
-      https://raw.githubusercontent.com/bol-van/zapret2/master/init.d/custom.d.examples.linux/50-discord-media
+    z2r_install_bolvan_voice_scripts "$custom_dir" || return 1
 
     echo -e "${green}Включены скрипты bol-van 50-discord-media/50-stun4all. 6 блок конфига отключён через --skip.${plain}"
   else
