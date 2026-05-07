@@ -20,6 +20,7 @@ Fyellow='\033[1;33m'
 Fblue='\033[1;34m'
 Fpink='\033[1;35m'
 Fcyan='\033[1;36m'
+Fblack='\033[1;30m'
 Bplain='\033[47m'
 Bred='\033[41m'
 Bgreen='\033[42m'
@@ -36,7 +37,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 # Проверяем наличие всех нужных lib-файлов, иначе запускаем внешний скрипт
 missing_libs=0
 LIB_DIR="$SCRIPT_DIR/zapret2/z2r_lib"
-for lib in ui.sh provider.sh telemetry.sh recommendations.sh netcheck.sh premium.sh strategies.sh submenus.sh actions.sh; do
+for lib in ui.sh provider.sh telemetry.sh recommendations.sh netcheck.sh premium.sh strategies.sh submenus.sh actions.sh config.sh orchestra_state.sh; do
   if [ ! -f "$LIB_DIR/$lib" ]; then
     missing_libs=1
     break
@@ -70,6 +71,12 @@ source "$SCRIPT_DIR/zapret2/z2r_lib/provider.sh"
 # Функции: init_telemetry, send_stats
 source "$SCRIPT_DIR/zapret2/z2r_lib/telemetry.sh" 
 
+# Общий API для чтения и правки /opt/zapret2/config
+source "$SCRIPT_DIR/zapret2/z2r_lib/config.sh"
+
+# Общий API состояния оркестратора/ручных локов
+source "$SCRIPT_DIR/zapret2/z2r_lib/orchestra_state.sh"
+
 # База подсказок по стратегиям (скачивание + вывод подсказки по провайдеру)
 # Функции: update_recommendations, show_hint
 source "$SCRIPT_DIR/zapret2/z2r_lib/recommendations.sh" 
@@ -87,7 +94,7 @@ source "$SCRIPT_DIR/zapret2/z2r_lib/premium.sh"
 source "$SCRIPT_DIR/zapret2/z2r_lib/strategies.sh" 
 
 # Подменю (UI-обвязка над Strats_Tryer + доп. меню управления: FLOWOFFLOAD, TCP443, провайдер)
-# Функции: strategies_submenu, flowoffload_submenu, tcp443_submenu, provider_submenu
+# Функции: strategies_submenu, flowoffload_submenu, tcp443_submenu, provider_submenu, beginner_guide_menu
 source "$SCRIPT_DIR/zapret2/z2r_lib/submenus.sh" 
 
 # Действия меню (бэкапы/сбросы/переключатели)
@@ -233,40 +240,8 @@ orchestra_stop() {
   rm -f "$ORCH_ENABLED_FLAG"
 }
 
-orchestra_status_text() {
-  if [ -x "$ORCH_SCRIPT" ]; then
-    if command -v pgrep >/dev/null 2>&1; then
-      if pgrep -f "$ORCH_SCRIPT run" >/dev/null 2>&1; then
-        echo "Включен"
-        return
-      fi
-    elif pidof sh >/dev/null 2>&1; then
-      if ps w | grep -F "$ORCH_SCRIPT run" | grep -v grep >/dev/null 2>&1; then
-        echo "Включен"
-        return
-      fi
-    fi
-  fi
-  if [ -f "$ORCH_ENABLED_FLAG" ]; then
-    echo "Включен (не запущен)"
-    return
-  fi
-  echo "Выключен"
-}
-
 hostlist_mode_text() {
-  local cfg="/opt/zapret2/config"
-  if [ -f "$cfg" ]; then
-    if grep -q '^MODE_FILTER=autohostlist' "$cfg"; then
-      echo "авто"
-      return
-    fi
-    if grep -q '^MODE_FILTER=hostlist' "$cfg"; then
-      echo "по листам"
-      return
-    fi
-  fi
-  echo "неизвестно"
+  config_hostlist_mode_text "$@"
 }
 
 toggle_hostlist_mode() {
@@ -300,11 +275,12 @@ fallback_mode_text() {
 }
 
 voice_mode_text() {
-  local cfg="/opt/zapret2/config"
+  local cfg
   local ports
   local voice_block_active=0
-  if [ -f "$cfg" ]; then
-    ports="$(sed -n 's/^NFQWS2_PORTS_UDP=//p' "$cfg" | head -n1)"
+  cfg="$(get_config_file)"
+  if [ -n "$cfg" ]; then
+    ports="$(config_get_var "$cfg" NFQWS2_PORTS_UDP)"
     if sed -n '/#Стратегии для голосовой связи/,/^[[:space:]]*--new[[:space:]]*$/p' "$cfg" | grep -q '^[[:space:]]*--filter-udp='; then
       voice_block_active=1
     fi
@@ -378,50 +354,7 @@ fallback_profile_try() {
 }
 
 tls_blob_menu_text() {
-  local cfg="/opt/zapret2/config"
-  local blob_file=""
-  local has_tls_maxru=0
-  local has_tls_default=0
-  if [ ! -f "$cfg" ]; then
-    cfg="/opt/zapret2/config.default"
-  fi
-  if [ ! -f "$cfg" ]; then
-    echo "неизвестно"
-    return
-  fi
-
-  if awk '
-      /--filter-l7=tls/ || index($0, "--hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt") {in_tls=1}
-      in_tls && /^[[:space:]]*--new[[:space:]]*$/ {in_tls=0}
-      in_tls && /--lua-desync=/ && /blob=maxru/ && $0 !~ /strategy=26/ {found=1}
-      END {exit(found?0:1)}
-    ' "$cfg"; then
-    has_tls_maxru=1
-  fi
-  if awk '
-      /--filter-l7=tls/ || index($0, "--hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt") {in_tls=1}
-      in_tls && /^[[:space:]]*--new[[:space:]]*$/ {in_tls=0}
-      in_tls && /--lua-desync=/ && /blob=fake_default_tls/ && $0 !~ /strategy=26/ {found=1}
-      END {exit(found?0:1)}
-    ' "$cfg"; then
-    has_tls_default=1
-  fi
-
-  if [ "$has_tls_default" -eq 1 ] && [ "$has_tls_maxru" -eq 0 ]; then
-    echo "default"
-    return
-  fi
-  if [ "$has_tls_default" -eq 1 ] && [ "$has_tls_maxru" -eq 1 ]; then
-    echo "mixed"
-    return
-  fi
-
-  blob_file="$(sed -n -E 's#.*--blob=maxru:@/opt/zapret2/files/fake/([^[:space:]]+).*#\1#p' "$cfg" | head -n1)"
-  if [ -n "$blob_file" ]; then
-    echo "$blob_file"
-  else
-    echo "неизвестно"
-  fi
+  config_tls_blob_text "$@"
 }
 
 
@@ -880,7 +813,7 @@ install_zapret_reboot() {
 #Для Entware Keenetic + merlin
 entware_fixes() {
  if [ "$hardware" = "keenetic" ]; then
-  curl -L -o /opt/zapret2/init.d/sysv/zapret2 https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z2r/Entware/zapret
+  curl -L -o /opt/zapret2/init.d/sysv/zapret2 https://000/IndeecFOX/zapret4rocket/z2r/Entware/zapret
   chmod +x /opt/zapret2/init.d/sysv/zapret2
   echo "Права выданы /opt/zapret2/init.d/sysv/zapret2"
   curl -L -o /opt/etc/ndm/netfilter.d/000-zapret.sh https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/Entware/000-zapret.sh
@@ -1413,6 +1346,7 @@ Enter (без цифр) - переустановка/обновление zapret
 '"${Fcyan}"'15.'"${yellow}"' Провайдер
 '"${Fcyan}"'16.'"${yellow}"' Сменить TLS blob (--blob=maxru). Сейчас: '"${plain}"'['"$(tls_blob_menu_text)"']'"${yellow}"'
 '"${Fcyan}"'777.'"${yellow}"' Активировать zeefeer premium (Нажимать только Valery ProD, avg97, Xoz, GeGunT, blagodarenya, mikhyan, Xoz, andric62, Whoze, Necronicle, Andrei_5288515371, Nomand, Dina_turat, Nergalss, Александру, АлександруП, vecheromholodno, ЕвгениюГ, Dyadyabo, skuwakin, izzzgoy, Grigaraz, Reconnaissance, comandante1928, umad, rudnev2028, rutakote, railwayfx, vtokarev1604, Grigaraz, a40letbezurojaya и subzeero452 и остальным поддержавшим проект. Но если очень хочется - можно нажать и другим)\033[0m'
+    echo -e "${Bred}${Fplain}17. Не знаешь, с чего начать? Есть проблемы? Жми сюда!${plain}"
     if [[ -f "$PREMIUM_FLAG" ]]; then
       echo -e "${red}999. Секретный пункт. Нажимать на свой страх и риск${plain}"
     fi
@@ -1565,6 +1499,10 @@ Enter (без цифр) - переустановка/обновление zapret
 
   "16")
     menu_action_set_tls_blob
+    ;;
+
+  "17")
+    beginner_guide_menu
     ;;
 
 

@@ -11,7 +11,27 @@ CONFIG_FILE="$ZAPRET_ROOT/config"
 CONFIG_DEFAULT_FILE="$ZAPRET_ROOT/config.default"
 ORCH_DIR="$ZAPRET_ROOT/extra_strats/cache/orchestra"
 ORCH_SCRIPT="$ORCH_DIR/orchestrator.sh"
-ORCH_LOCK_FILE="${ORCH_LOCK_FILE:-$ORCH_DIR/locked.tsv}"
+LIB_DIR=""
+
+find_runtime_libs() {
+  local here dir
+  here="$(cd -- "$(dirname -- "$0")" && pwd)"
+  for dir in \
+    "$ZAPRET_ROOT/z2r_lib" \
+    "$here/../../z2r_lib" \
+    "$here/../../lib" \
+    "$here/../lib"; do
+    if [ -f "$dir/orchestra_state.sh" ] && [ -f "$dir/config.sh" ]; then
+      LIB_DIR="$dir"
+      return 0
+    fi
+  done
+  return 1
+}
+
+find_runtime_libs || { echo 'Status: 500 Internal Server Error\r'; echo; echo '{"error":"missing z2r runtime libs"}'; exit 0; }
+. "$LIB_DIR/config.sh"
+. "$LIB_DIR/orchestra_state.sh"
 
 json_escape() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\r//g; s/\n/\\n/g'
@@ -52,11 +72,7 @@ parse_params() {
 }
 
 get_config_file() {
-  if [ -f "$CONFIG_FILE" ]; then
-    echo "$CONFIG_FILE"
-  else
-    echo "$CONFIG_DEFAULT_FILE"
-  fi
+  config_get_file "$CONFIG_FILE"
 }
 
 set_zapret2_init() {
@@ -68,165 +84,23 @@ set_zapret2_init() {
 }
 
 hostlist_mode_text() {
-  local cfg
-  cfg="$(get_config_file)"
-  if [ -f "$cfg" ]; then
-    if grep -q '^MODE_FILTER=autohostlist' "$cfg"; then
-      echo "авто"
-      return
-    fi
-    if grep -q '^MODE_FILTER=hostlist' "$cfg"; then
-      echo "по листам"
-      return
-    fi
-  fi
-  echo "неизвестно"
+  config_hostlist_mode_text "$CONFIG_FILE"
 }
 
 flowoffload_text() {
-  local cfg
-  cfg="$(get_config_file)"
-  sed -n 's/^FLOWOFFLOAD=//p' "$cfg" 2>/dev/null | head -n1
+  config_get_var "$CONFIG_FILE" FLOWOFFLOAD
 }
 
 fwtype_text() {
-  local cfg
-  cfg="$(get_config_file)"
-  sed -n 's/^FWTYPE=//p' "$cfg" 2>/dev/null | head -n1
+  config_get_var "$CONFIG_FILE" FWTYPE
 }
 
 tls_blob_menu_text() {
-  local cfg blob_file has_tls_maxru=0 has_tls_default=0
-  cfg="$(get_config_file)"
-  [ -f "$cfg" ] || { echo "неизвестно"; return; }
-
-  if awk '
-      /--filter-l7=tls/ || index($0, "--hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt") {in_tls=1}
-      in_tls && /^[[:space:]]*--new[[:space:]]*$/ {in_tls=0}
-      in_tls && /--lua-desync=/ && /blob=maxru/ && $0 !~ /strategy=26/ {found=1}
-      END {exit(found?0:1)}
-    ' "$cfg"; then
-    has_tls_maxru=1
-  fi
-  if awk '
-      /--filter-l7=tls/ || index($0, "--hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt") {in_tls=1}
-      in_tls && /^[[:space:]]*--new[[:space:]]*$/ {in_tls=0}
-      in_tls && /--lua-desync=/ && /blob=fake_default_tls/ && $0 !~ /strategy=26/ {found=1}
-      END {exit(found?0:1)}
-    ' "$cfg"; then
-    has_tls_default=1
-  fi
-
-  if [ "$has_tls_default" -eq 1 ] && [ "$has_tls_maxru" -eq 0 ]; then
-    echo "default"
-    return
-  fi
-  if [ "$has_tls_default" -eq 1 ] && [ "$has_tls_maxru" -eq 1 ]; then
-    echo "mixed"
-    return
-  fi
-
-  blob_file="$(sed -n -E 's#.*--blob=maxru:@/opt/zapret2/files/fake/([^[:space:]]+).*#\1#p' "$cfg" | head -n1)"
-  if [ -n "$blob_file" ]; then
-    echo "$blob_file"
-  else
-    echo "неизвестно"
-  fi
-}
-
-orchestra_status_text() {
-  if [ -x "$ORCH_SCRIPT" ]; then
-    if pgrep -f "$ORCH_SCRIPT run" >/dev/null 2>&1; then
-      echo "Включен"
-      return
-    fi
-  fi
-  if [ -f "$ORCH_DIR/enabled" ]; then
-    echo "Включен (не запущен)"
-    return
-  fi
-  echo "Выключен"
-}
-
-zapret2_running() {
-  pidof nfqws2 >/dev/null 2>&1
-}
-
-orch_locked_get() {
-  local profile="$1"
-  local proto="$2"
-  [ -f "$ORCH_LOCK_FILE" ] || { echo "0"; return; }
-  awk -v pr="$profile" -v p="$proto" 'BEGIN{FS="\t"}{
-    if ($1==pr && $2==p && NF>=3) {print $3; found=1; exit}
-    if ($1==pr && NF==2 && p=="tls") {print $2; found=1; exit}
-  } END{if (!found) print 0}' "$ORCH_LOCK_FILE"
-}
-
-orch_locked_set() {
-  local profile="$1"
-  local proto="$2"
-  local strategy="$3"
-  local tmp="${ORCH_LOCK_FILE}.tmp"
-  mkdir -p "$(dirname "$ORCH_LOCK_FILE")"
-  touch "$ORCH_LOCK_FILE"
-  awk -v pr="$profile" -v p="$proto" -v s="$strategy" 'BEGIN{FS=OFS="\t"}{
-    if ($1==pr && (($2==p) || (NF==2 && p=="tls"))) {print pr,p,s; found=1; next}
-    print
-  } END{
-    if (!found) print pr,p,s
-  }' "$ORCH_LOCK_FILE" > "$tmp" && mv "$tmp" "$ORCH_LOCK_FILE"
-}
-
-orch_locked_clear() {
-  local profile="$1"
-  local proto="$2"
-  local tmp="${ORCH_LOCK_FILE}.tmp"
-  [ -f "$ORCH_LOCK_FILE" ] || return 0
-  awk -v pr="$profile" -v p="$proto" 'BEGIN{FS=OFS="\t"}{
-    if ($1==pr && (($2==p) || (NF==2 && p=="tls"))) next
-    print
-  }' "$ORCH_LOCK_FILE" > "$tmp" && mv "$tmp" "$ORCH_LOCK_FILE"
+  config_tls_blob_text "$CONFIG_FILE"
 }
 
 orch_max_strategy_for_profile() {
-  local profile="$1"
-  local cfg
-  cfg="$(get_config_file)"
-  [ -f "$cfg" ] || { echo "0"; return; }
-  if [ "$profile" = "8" ]; then
-    awk '
-      BEGIN{inblk=0; max=0}
-      /^[[:space:]]*#Z2R_FALLBACK_BEGIN/ {inblk=1; next}
-      /^[[:space:]]*#Z2R_FALLBACK_END/ {inblk=0; exit}
-      inblk {
-        line=$0
-        while (match(line, /strategy=[0-9]+/)) {
-          num=substr(line, RSTART+9, RLENGTH-9)+0
-          if (num>max) max=num
-          line=substr(line, RSTART+RLENGTH)
-        }
-      }
-      END{print max}
-    ' "$cfg"
-    return
-  fi
-  awk -v pid="$profile" '
-    BEGIN{inopt=0; prof=1; max=0}
-    /^NFQWS2_OPT="/ {inopt=1}
-    inopt {
-      if ($0 ~ /^--new/) {prof++}
-      if (prof==pid) {
-        line=$0
-        while (match(line, /strategy=[0-9]+/)) {
-          num=substr(line, RSTART+9, RLENGTH-9)+0
-          if (num>max) max=num
-          line=substr(line, RSTART+RLENGTH)
-        }
-      }
-      if ($0 ~ /^"$/) {exit}
-    }
-    END{print max}
-  ' "$cfg"
+  config_profile_max_strategy "$1" "$CONFIG_FILE"
 }
 
 profile_proto() {

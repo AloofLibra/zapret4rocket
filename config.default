@@ -130,6 +130,7 @@ NFQWS2_OPT="
 
 --new
 
+#Z2R_TCP443_BEGIN
 --filter-tcp=443 --filter-l7=tls
 --hostlist-domains=googlevideo.com
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello 
@@ -168,6 +169,7 @@ NFQWS2_OPT="
 --lua-desync=send:repeats=2:strategy=29 --lua-desync=syndata:blob=google_www:strategy=29 --lua-desync=multisplit:seqovl=211:seqovl_pattern=tls5:strategy=29
 
 --new
+#Z2R_TCP443_END
 
   #Стратегии для RKN
 --filter-tcp=80,443,2053,2083,2087,2096,8443 --filter-l7=tls

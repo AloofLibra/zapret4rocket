@@ -37,86 +37,8 @@ get_current_strategies_info() {
     echo -e "YT_UDP:$(colorize_num "$s_udp") YT_TCP:$(colorize_num "$s_tcp") YT_GV:$(colorize_num "$s_gv") RKN:$(colorize_num "$s_rkn")"
 }
 
-orch_lock_file="${orch_lock_file:-/opt/zapret2/extra_strats/cache/orchestra/locked.tsv}"
-
-orch_locked_get() {
-    local profile="$1"
-    local proto="$2"
-    [ ! -f "$orch_lock_file" ] && { echo "0"; return; }
-    awk -v pr="$profile" -v p="$proto" 'BEGIN{FS="\t"}{
-        if ($1==pr && $2==p && NF>=3) {print $3; exit}
-        if ($1==pr && NF==2 && p=="tls") {print $2; exit}
-    } END{if (NR==0) print 0}' "$orch_lock_file"
-}
-
-orch_locked_set() {
-    local profile="$1"
-    local proto="$2"
-    local strat="$3"
-    local tmp="${orch_lock_file}.tmp"
-    mkdir -p "$(dirname "$orch_lock_file")"
-    touch "$orch_lock_file"
-    awk -v pr="$profile" -v p="$proto" -v s="$strat" 'BEGIN{FS=OFS="\t"}{
-        if ($1==pr && (($2==p) || (NF==2 && p=="tls"))) {print pr,p,s; found=1; next}
-        print
-    } END{
-        if (!found) print pr,p,s
-    }' "$orch_lock_file" > "$tmp" && mv "$tmp" "$orch_lock_file"
-}
-
-orch_locked_clear() {
-    local profile="$1"
-    local proto="$2"
-    local tmp="${orch_lock_file}.tmp"
-    [ ! -f "$orch_lock_file" ] && return 0
-    awk -v pr="$profile" -v p="$proto" 'BEGIN{FS=OFS="\t"}{
-        if ($1==pr && (($2==p) || (NF==2 && p=="tls"))) next
-        print
-    }' "$orch_lock_file" > "$tmp" && mv "$tmp" "$orch_lock_file"
-}
-
 orch_max_strategy_for_profile() {
-    local profile="$1"
-    local cfg="/opt/zapret2/config"
-    [ ! -f "$cfg" ] && cfg="/opt/zapret2/config.default"
-    if [ "$profile" = "8" ]; then
-        local fallback_max
-        fallback_max="$(awk '
-            BEGIN{inblk=0; max=0}
-            /^[[:space:]]*#Z2R_FALLBACK_BEGIN/ {inblk=1; next}
-            /^[[:space:]]*#Z2R_FALLBACK_END/ {inblk=0; exit}
-            inblk {
-                line=$0
-                while (match(line, /strategy=[0-9]+/)) {
-                    num=substr(line, RSTART+9, RLENGTH-9)+0
-                    if (num>max) max=num
-                    line=substr(line, RSTART+RLENGTH)
-                }
-            }
-            END{print max}
-        ' "$cfg")"
-        if [ -n "$fallback_max" ] && [ "$fallback_max" -gt 0 ]; then
-            echo "$fallback_max"
-            return
-        fi
-    fi
-    awk -v pid="$profile" '
-        BEGIN{inopt=0; prof=1; max=0}
-        /^NFQWS2_OPT="/ {inopt=1}
-        inopt {
-            if ($0 ~ /^--new/) {prof++}
-            if (prof==pid) {
-                line=$0
-                while (match(line, /strategy=[0-9]+/)) {
-                    num=substr(line, RSTART+9, RLENGTH-9)+0
-                    if (num>max) max=num
-                    line=substr(line, RSTART+RLENGTH)
-                }
-            }
-            if ($0 ~ /^"$/) {exit}
-        }
-        END{print max}
-    ' "$cfg"
+    config_profile_max_strategy "$1"
 }
 
 orch_profile_try() {

@@ -136,14 +136,16 @@ menu_action_toggle_bolvan_ports() {
 }
 
 menu_action_toggle_fwtype() {
-  if grep -q '^FWTYPE=iptables$' "/opt/zapret2/config"; then
-    sed -i 's/^FWTYPE=iptables$/FWTYPE=nftables/' "/opt/zapret2/config"
+  local cfg
+  cfg="$(get_config_file)"
+  if [ "$(config_get_var "$cfg" FWTYPE)" = "iptables" ]; then
+    config_set_var "$cfg" FWTYPE nftables
     /opt/zapret2/install_prereq.sh
     "$ZAPRET2_INIT" restart
     echo -e "${green}Zapret moode: nftables.${plain}"
 
-  elif grep -q '^FWTYPE=nftables$' "/opt/zapret2/config"; then
-    sed -i 's/^FWTYPE=nftables$/FWTYPE=iptables/' "/opt/zapret2/config"
+  elif [ "$(config_get_var "$cfg" FWTYPE)" = "nftables" ]; then
+    config_set_var "$cfg" FWTYPE iptables
     /opt/zapret2/install_prereq.sh
     "$ZAPRET2_INIT" restart
     echo -e "${green}Zapret moode: iptables.${plain}"
@@ -156,14 +158,16 @@ menu_action_toggle_fwtype() {
 }
 
 menu_action_toggle_udp_range() {
-  if grep -q '^NFQWS_PORTS_UDP=443' "/opt/zapret2/config"; then
-    sed -i 's/^NFQWS_PORTS_UDP=443/NFQWS_PORTS_UDP=1026-65531,443/' "/opt/zapret2/config"
-    sed -i 's/^--skip --filter-udp=1026/--filter-udp=1026/' "/opt/zapret2/config"
+  local cfg
+  cfg="$(get_config_file)"
+  if [ "$(config_get_var "$cfg" NFQWS_PORTS_UDP)" = "443" ]; then
+    config_set_var "$cfg" NFQWS_PORTS_UDP "1026-65531,443"
+    sed -i 's/^--skip --filter-udp=1026/--filter-udp=1026/' "$cfg"
     echo -e "${green}Стратегия UDP обхода активирована. Выделены порты 1026-65531${plain}"
 
-  elif grep -q '^NFQWS_PORTS_UDP=1026-65531,443' "/opt/zapret2/config"; then
-    sed -i 's/^NFQWS_PORTS_UDP=1026-65531,443/NFQWS_PORTS_UDP=443/' "/opt/zapret2/config"
-    sed -i 's/^--filter-udp=1026/--skip --filter-udp=1026/' "/opt/zapret2/config"
+  elif [ "$(config_get_var "$cfg" NFQWS_PORTS_UDP)" = "1026-65531,443" ]; then
+    config_set_var "$cfg" NFQWS_PORTS_UDP "443"
+    sed -i 's/^--filter-udp=1026/--skip --filter-udp=1026/' "$cfg"
     echo -e "${green}Стратегия UDP обхода ДЕактивирована. Выделенные порты 1026-65531 убраны${plain}"
 
   else
