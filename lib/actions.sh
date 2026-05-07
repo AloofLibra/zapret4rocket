@@ -53,13 +53,7 @@ menu_action_update_config_reset() {
 
   if [ ! -f /opt/zapret2/files/fake/custom_tls.bin ]; then
     mkdir -p /opt/zapret2/files/fake
-    if command -v curl >/dev/null 2>&1; then
-      curl -fsSL -o /opt/zapret2/files/fake/custom_tls.bin \
-        https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/fake/custom_tls.bin
-    elif command -v wget >/dev/null 2>&1; then
-      wget -qO /opt/zapret2/files/fake/custom_tls.bin \
-        https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/fake/custom_tls.bin
-    else
+    if ! z2r_download_project_file /opt/zapret2/files/fake/custom_tls.bin "fake/custom_tls.bin"; then
       echo -e "${yellow}Не удалось скачать custom_tls.bin: нет curl/wget.${plain}"
     fi
   fi

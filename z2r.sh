@@ -29,6 +29,80 @@ Bblue='\033[44m'
 Bpink='\033[45m'
 Bcyan='\033[46m'
 
+Z2R_BRANCH="${Z2R_BRANCH:-z2r}"
+Z2R_PROJECT_RAW_BASE="${Z2R_PROJECT_RAW_BASE:-https://raw.githubusercontent.com/AloofLibra/zapret4rocket/${Z2R_BRANCH}}"
+Z2R_PROJECT_MIRROR_BASE="${Z2R_PROJECT_MIRROR_BASE:-https://git.px.rkn.quest/AloofLibra/plain}"
+Z2R_INSTALLER_URL="${Z2R_INSTALLER_URL:-${Z2R_PROJECT_RAW_BASE}/z2r}"
+
+z2r_mirror_url() {
+  printf '%s/%s?h=%s' "$Z2R_PROJECT_MIRROR_BASE" "$1" "$Z2R_BRANCH"
+}
+
+z2r_fetch_url_to_file() {
+  local dest="$1"
+  local url="$2"
+
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL -o "$dest" "$url"
+    return $?
+  fi
+  if command -v wget >/dev/null 2>&1; then
+    wget -qO "$dest" "$url"
+    return $?
+  fi
+  return 127
+}
+
+z2r_download_project_file() {
+  local dest="$1"
+  local rel="$2"
+  local tmp="${dest}.tmp.$$"
+  local primary="${Z2R_PROJECT_RAW_BASE}/${rel}"
+  local mirror
+
+  mirror="$(z2r_mirror_url "$rel")"
+  mkdir -p "$(dirname "$dest")"
+  rm -f "$tmp"
+  if z2r_fetch_url_to_file "$tmp" "$primary"; then
+    mv -f "$tmp" "$dest"
+    return 0
+  fi
+  echo -e "${yellow}GitHub недоступен для $rel. Пробую зеркало.${plain}"
+  rm -f "$tmp"
+  if z2r_fetch_url_to_file "$tmp" "$mirror"; then
+    mv -f "$tmp" "$dest"
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
+z2r_download_project_stdout() {
+  local rel="$1"
+  local tmp="/tmp/z2r_download_$$"
+
+  if z2r_download_project_file "$tmp" "$rel"; then
+    cat "$tmp"
+    rm -f "$tmp"
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
+z2r_exec_external_installer() {
+  local mirror
+  local tmp="/tmp/z2r_installer_$$"
+
+  mirror="$(z2r_mirror_url "z2r")"
+  if z2r_fetch_url_to_file "$tmp" "$Z2R_INSTALLER_URL" || z2r_fetch_url_to_file "$tmp" "$mirror"; then
+    exec sh "$tmp" "$@"
+  fi
+  rm -f "$tmp"
+  echo "Ошибка: не удалось загрузить внешний z2r."
+  exit 1
+}
+
 #___Проверка на наличие необходимых библиотек___#
 
 #Определяем путь скрипта, подгружаем функции
@@ -46,14 +120,7 @@ done
 
 if [ "$missing_libs" -ne 0 ]; then
   echo "Не найдены нужные файлы в $LIB_DIR. Запускаю внешний z2r..."
-  if command -v curl >/dev/null 2>&1; then
-    exec sh -c 'curl -fsSL "https://raw.githubusercontent.com/AloofLibra/z4r/z2r/z2r" | sh'
-  elif command -v wget >/dev/null 2>&1; then
-    exec sh -c 'wget -qO- "https://raw.githubusercontent.com/AloofLibra/z4r/z2r/z2r" | sh'
-  else
-    echo "Ошибка: нет curl или wget для загрузки внешнего z2r."
-    exit 1
-  fi
+  z2r_exec_external_installer "$@"
 fi
 
 #___Сначала идут анонсы функций____
@@ -180,22 +247,11 @@ ORCH_DIR="/opt/zapret2/extra_strats/cache/orchestra"
 ORCH_LUA_LOCKED="/opt/zapret2/lua/locked.lua"
 
 locked_lua_update_from_repo() {
-  local locked_url="https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/orchestra/locked.lua"
   local tmp="${ORCH_LUA_LOCKED}.tmp"
 
   mkdir -p "$ORCH_DIR" "$(dirname "$ORCH_LUA_LOCKED")"
-  if command -v curl >/dev/null 2>&1; then
-    if ! curl -fsSL -o "$tmp" "$locked_url"; then
-      echo -e "${red}Не удалось скачать locked.lua (curl).${plain}"
-      return 1
-    fi
-  elif command -v wget >/dev/null 2>&1; then
-    if ! wget -qO "$tmp" "$locked_url"; then
-      echo -e "${red}Не удалось скачать locked.lua (wget).${plain}"
-      return 1
-    fi
-  else
-    echo -e "${red}Нет curl или wget для обновления locked.lua.${plain}"
+  if ! z2r_download_project_file "$tmp" "orchestra/locked.lua"; then
+    echo -e "${red}Не удалось скачать locked.lua.${plain}"
     return 1
   fi
 
@@ -595,23 +651,17 @@ get_repo() {
   chmod 777 /opt/zapret2/extra_strats/cache/orchestra 2>/dev/null || true
   locked_lua_update_from_repo || true
   for listfile in cloudflare-ipset.txt cloudflare-ipset_v6.txt netrogat.txt russia-discord.txt russia-youtube-rtmps.txt russia-youtube.txt russia-youtubeQ.txt tg_cidr.txt; do
-    curl -L -o /opt/zapret2/lists/$listfile https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z4r/lists/$listfile
+    z2r_download_project_file "/opt/zapret2/lists/$listfile" "lists/$listfile" || return 1
   done
-  curl -L "https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master/fake_files.tar.gz" | tar -xz -C /opt/zapret2/files/fake
-  curl -L -o /opt/zapret2/extra_strats/UDP_YT_list.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/UDP/YT/List.txt
-  curl -L -o /opt/zapret2/extra_strats/TCP_RKN_list.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/TCP/RKN/List.txt
-  curl -L -o /opt/zapret2/extra_strats/TCP_YT_list.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/TCP/YT/List.txt
-  curl -L -o /opt/zapret2/extra_strats/TCP_GV_list.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/TCP/GV/List.txt
-  curl -L -o /opt/zapret2/extra_strats/TCP_Discord.txt https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/extra_strats/TCP/RKN/Discord.txt
+  z2r_download_project_stdout "fake_files.tar.gz" | tar -xz -C /opt/zapret2/files/fake
+  z2r_download_project_file /opt/zapret2/extra_strats/UDP_YT_list.txt "extra_strats/UDP/YT/List.txt" || return 1
+  z2r_download_project_file /opt/zapret2/extra_strats/TCP_RKN_list.txt "extra_strats/TCP/RKN/List.txt" || return 1
+  z2r_download_project_file /opt/zapret2/extra_strats/TCP_YT_list.txt "extra_strats/TCP/YT/List.txt" || return 1
+  z2r_download_project_file /opt/zapret2/extra_strats/TCP_GV_list.txt "extra_strats/TCP/GV/List.txt" || return 1
+  z2r_download_project_file /opt/zapret2/extra_strats/TCP_Discord.txt "extra_strats/TCP/RKN/Discord.txt" || return 1
   if [ ! -f /opt/zapret2/files/fake/custom_tls.bin ]; then
     mkdir -p /opt/zapret2/files/fake
-    if command -v curl >/dev/null 2>&1; then
-      curl -fsSL -o /opt/zapret2/files/fake/custom_tls.bin \
-        https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/fake/custom_tls.bin
-    elif command -v wget >/dev/null 2>&1; then
-      wget -qO /opt/zapret2/files/fake/custom_tls.bin \
-        https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/fake/custom_tls.bin
-    else
+    if ! z2r_download_project_file /opt/zapret2/files/fake/custom_tls.bin "fake/custom_tls.bin"; then
       echo -e "${yellow}Не удалось скачать custom_tls.bin: нет curl/wget.${plain}"
     fi
   fi
@@ -626,7 +676,7 @@ get_repo() {
     echo "Востановление листа исключений выполнено."
   fi
   #Копирование нашего конфига на замену стандартному и скриптов для войсов DS, WA, TG
-  curl -L -o /opt/zapret2/config.default https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/config.default
+  z2r_download_project_file /opt/zapret2/config.default "config.default" || return 1
   if command -v nft >/dev/null 2>&1; then
     sed -i 's/^FWTYPE=iptables$/FWTYPE=nftables/' "/opt/zapret2/config.default"
   fi
@@ -758,13 +808,13 @@ install_zapret_reboot() {
 #Для Entware Keenetic + merlin
 entware_fixes() {
  if [ "$hardware" = "keenetic" ]; then
-  curl -L -o /opt/zapret2/init.d/sysv/zapret2 https://000/IndeecFOX/zapret4rocket/z2r/Entware/zapret
+  z2r_download_project_file /opt/zapret2/init.d/sysv/zapret2 "Entware/zapret" || return 1
   chmod +x /opt/zapret2/init.d/sysv/zapret2
   echo "Права выданы /opt/zapret2/init.d/sysv/zapret2"
-  curl -L -o /opt/etc/ndm/netfilter.d/000-zapret.sh https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/Entware/000-zapret.sh
+  z2r_download_project_file /opt/etc/ndm/netfilter.d/000-zapret.sh "Entware/000-zapret.sh" || return 1
   chmod +x /opt/etc/ndm/netfilter.d/000-zapret.sh
   echo "Права выданы /opt/etc/ndm/netfilter.d/000-zapret.sh"
-  curl -L -o /opt/etc/init.d/S00fix https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/z2r/Entware/S00fix
+  z2r_download_project_file /opt/etc/init.d/S00fix "Entware/S00fix" || return 1
   chmod +x /opt/etc/init.d/S00fix
   echo "Права выданы /opt/etc/init.d/S00fix"
   cp -a /opt/zapret2/init.d/custom.d.examples.linux/10-keenetic-udp-fix /opt/zapret2/init.d/sysv/custom.d/10-keenetic-udp-fix
@@ -812,8 +862,8 @@ get_panel() {
      echo "Установка 3proxy (by SnoyIatk). Доустановка с apt build-essential для сборки (debian/ubuntu)"
 	 apt update && apt install build-essential
      bash <(curl -Ls https://raw.githubusercontent.com/SnoyIatk/3proxy/master/3proxyinstall.sh)
-     curl -L -o /etc/3proxy/.proxyauth https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/refs/heads/z2r/del.proxyauth
-     curl -L -o /etc/3proxy/3proxy.cfg https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/refs/heads/z2r/3proxy.cfg
+     z2r_download_project_file /etc/3proxy/.proxyauth "del.proxyauth"
+     z2r_download_project_file /etc/3proxy/3proxy.cfg "3proxy.cfg"
  elif [[ "$clean_answer" == "MARZBAN" ]]; then
      echo "Установка Marzban"
      bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install
@@ -835,21 +885,13 @@ webui_repo_fetch() {
   local rel="$1"
   local dest="$2"
   local local_src="$SCRIPT_DIR/webui/$rel"
-  local remote_url="https://raw.githubusercontent.com/AloofLibra/zapret4rocket/z2r/webui/$rel"
 
   mkdir -p "$(dirname "$dest")"
   if [ -f "$local_src" ]; then
     cp -f "$local_src" "$dest"
     return 0
   fi
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL -o "$dest" "$remote_url"
-    return $?
-  fi
-  if command -v wget >/dev/null 2>&1; then
-    wget -qO "$dest" "$remote_url"
-    return $?
-  fi
+  z2r_download_project_file "$dest" "webui/$rel" && return 0
   echo -e "${red}Нет curl или wget для загрузки web UI.${plain}"
   return 1
 }

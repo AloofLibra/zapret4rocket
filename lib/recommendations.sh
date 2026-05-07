@@ -15,7 +15,11 @@ update_recommendations() {
   fi
 
   # Если файла нет или он старый - качаем
-  curl -s --max-time 5 "$RECS_URL" -o "$RECS_FILE" || rm -f "$RECS_FILE"
+  if command -v z2r_download_project_file >/dev/null 2>&1; then
+    z2r_download_project_file "$RECS_FILE" "recommendations.txt" || rm -f "$RECS_FILE"
+  else
+    curl -s --max-time 5 "$RECS_URL" -o "$RECS_FILE" || rm -f "$RECS_FILE"
+  fi
   return 0
 }
 
