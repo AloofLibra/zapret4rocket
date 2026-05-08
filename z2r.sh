@@ -943,7 +943,12 @@ zapret_get() {
  fi
  sh /tmp/zapret2/install_bin.sh
  find /tmp/zapret2/binaries/* -maxdepth 0 -type d ! -name "$(basename "$(dirname "$(readlink /tmp/zapret2/nfq2/nfqws2)")")" -exec rm -rf {} +
+ rm -rf /opt/zapret2
  mv zapret2 /opt/zapret2
+ if [ ! -f /opt/zapret2/install_easy.sh ]; then
+     echo -e "${red}zapret2 установлен некорректно: нет /opt/zapret2/install_easy.sh.${plain}"
+     return 1
+ fi
 }
 
 #Запуск установочных скриптов и перезагрузка
