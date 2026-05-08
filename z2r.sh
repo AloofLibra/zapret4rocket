@@ -33,6 +33,8 @@ Z2R_BRANCH="${Z2R_BRANCH:-z2r}"
 Z2R_PROJECT_RAW_BASE="${Z2R_PROJECT_RAW_BASE:-https://raw.githubusercontent.com/AloofLibra/zapret4rocket/${Z2R_BRANCH}}"
 Z2R_PROJECT_MIRROR_BASE="${Z2R_PROJECT_MIRROR_BASE:-https://git.px.rkn.quest/AloofLibra/plain}"
 Z2R_INSTALLER_URL="${Z2R_INSTALLER_URL:-${Z2R_PROJECT_RAW_BASE}/z2r}"
+ZAPRET2_UPSTREAM_RAW_BASE="${ZAPRET2_UPSTREAM_RAW_BASE:-https://raw.githubusercontent.com/bol-van/zapret2/master}"
+ZAPRET2_UPSTREAM_MIRROR_BASE="${ZAPRET2_UPSTREAM_MIRROR_BASE:-https://git.px.rkn.quest/zapret2/plain}"
 
 z2r_mirror_url() {
   printf '%s/%s?h=%s' "$Z2R_PROJECT_MIRROR_BASE" "$1" "$Z2R_BRANCH"
@@ -84,6 +86,34 @@ z2r_download_project_stdout() {
   if z2r_download_project_file "$tmp" "$rel"; then
     cat "$tmp"
     rm -f "$tmp"
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
+z2r_upstream_mirror_url() {
+  printf '%s/%s?h=master' "$ZAPRET2_UPSTREAM_MIRROR_BASE" "$1"
+}
+
+z2r_download_upstream_file() {
+  local dest="$1"
+  local rel="$2"
+  local tmp="${dest}.tmp.$$"
+  local primary="${ZAPRET2_UPSTREAM_RAW_BASE}/${rel}"
+  local mirror
+
+  mirror="$(z2r_upstream_mirror_url "$rel")"
+  mkdir -p "$(dirname "$dest")"
+  rm -f "$tmp"
+  if z2r_fetch_url_to_file "$tmp" "$primary"; then
+    mv -f "$tmp" "$dest"
+    return 0
+  fi
+  echo -e "${yellow}GitHub недоступен для zapret2/$rel. Пробую зеркало.${plain}" >&2
+  rm -f "$tmp"
+  if z2r_fetch_url_to_file "$tmp" "$mirror"; then
+    mv -f "$tmp" "$dest"
     return 0
   fi
   rm -f "$tmp"
@@ -652,11 +682,11 @@ z2r_install_bolvan_voice_scripts() {
 
   mkdir -p "$custom_dir"
   for script in 50-stun4all 50-discord-media; do
-    if [ ! -f "$examples_dir/$script" ]; then
-      echo -e "${red}Не найден $examples_dir/$script.${plain}"
-      return 1
+    if [ -f "$examples_dir/$script" ]; then
+      cp -f "$examples_dir/$script" "$custom_dir/$script" || return 1
+    else
+      z2r_download_upstream_file "$custom_dir/$script" "init.d/custom.d.examples.linux/$script" || return 1
     fi
-    cp -f "$examples_dir/$script" "$custom_dir/$script" || return 1
     chmod +x "$custom_dir/$script" 2>/dev/null || true
   done
 }
@@ -837,7 +867,11 @@ entware_fixes() {
   z2r_download_project_file /opt/etc/init.d/S00fix "Entware/S00fix" || return 1
   chmod +x /opt/etc/init.d/S00fix
   echo "Права выданы /opt/etc/init.d/S00fix"
-  cp -a /opt/zapret2/init.d/custom.d.examples.linux/10-keenetic-udp-fix /opt/zapret2/init.d/sysv/custom.d/10-keenetic-udp-fix
+  if [ -f /opt/zapret2/init.d/custom.d.examples.linux/10-keenetic-udp-fix ]; then
+    cp -a /opt/zapret2/init.d/custom.d.examples.linux/10-keenetic-udp-fix /opt/zapret2/init.d/sysv/custom.d/10-keenetic-udp-fix
+  else
+    z2r_download_upstream_file /opt/zapret2/init.d/sysv/custom.d/10-keenetic-udp-fix "init.d/custom.d.examples.linux/10-keenetic-udp-fix" || return 1
+  fi
   echo "10-keenetic-udp-fix скопирован"
  elif [ "$hardware" = "merlin" ]; then
   if sed -n '167p' /opt/zapret2/install_easy.sh | grep -q '^nfqws_opt_validat'; then
