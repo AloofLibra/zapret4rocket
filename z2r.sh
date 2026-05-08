@@ -35,6 +35,10 @@ Z2R_PROJECT_MIRROR_BASE="${Z2R_PROJECT_MIRROR_BASE:-https://git.px.rkn.quest/Alo
 Z2R_INSTALLER_URL="${Z2R_INSTALLER_URL:-${Z2R_PROJECT_RAW_BASE}/z2r}"
 ZAPRET2_UPSTREAM_RAW_BASE="${ZAPRET2_UPSTREAM_RAW_BASE:-https://raw.githubusercontent.com/bol-van/zapret2/master}"
 ZAPRET2_UPSTREAM_MIRROR_BASE="${ZAPRET2_UPSTREAM_MIRROR_BASE:-https://git.px.rkn.quest/zapret2/plain}"
+ZAPRET2_RELEASE_BASE="${ZAPRET2_RELEASE_BASE:-https://github.com/bol-van/zapret2/releases/download}"
+ZAPRET2_RELEASE_MIRROR_BASE="${ZAPRET2_RELEASE_MIRROR_BASE:-}"
+ZAPRET2_YANDEX_0952="${ZAPRET2_YANDEX_0952:-https://disk.yandex.ru/d/M26CLc7XCEV_og}"
+ZAPRET2_YANDEX_0952_OPENWRT="${ZAPRET2_YANDEX_0952_OPENWRT:-https://disk.yandex.ru/d/ER1R2TNw8f7KYA}"
 
 z2r_mirror_url() {
   printf '%s/%s?h=%s' "$Z2R_PROJECT_MIRROR_BASE" "$1" "$Z2R_BRANCH"
@@ -117,6 +121,72 @@ z2r_download_upstream_file() {
     return 0
   fi
   rm -f "$tmp"
+  return 1
+}
+
+z2r_yandex_public_for_release() {
+  local tarfile="$2"
+
+  case "$tarfile" in
+    *-openwrt-embedded.tar.gz)
+      printf '%s' "$ZAPRET2_YANDEX_0952_OPENWRT"
+      ;;
+    *.tar.gz)
+      printf '%s' "$ZAPRET2_YANDEX_0952"
+      ;;
+  esac
+}
+
+z2r_download_yandex_public_file() {
+  local dest="$1"
+  local public_url="$2"
+  local api_tmp="/tmp/z2r_yadisk_$$.json"
+  local href
+
+  rm -f "$api_tmp" "$dest"
+  if ! z2r_fetch_url_to_file "$api_tmp" "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key=$public_url"; then
+    rm -f "$api_tmp"
+    return 1
+  fi
+  href="$(sed -n 's/.*"href":"\([^"]*\)".*/\1/p' "$api_tmp" | sed 's/\\u0026/\&/g; s#\\/#/#g' | head -n1)"
+  rm -f "$api_tmp"
+  [ -n "$href" ] || return 1
+
+  z2r_fetch_url_to_file "$dest" "$href"
+}
+
+z2r_download_zapret2_release() {
+  local dest="$1"
+  local ver="$2"
+  local tarfile="$3"
+  local primary="${ZAPRET2_RELEASE_BASE}/v${ver}/${tarfile}"
+  local mirror=""
+  local yadisk=""
+
+  rm -f "$dest"
+  if z2r_fetch_url_to_file "$dest" "$primary"; then
+    return 0
+  fi
+  rm -f "$dest"
+
+  if [ -n "$ZAPRET2_RELEASE_MIRROR_BASE" ]; then
+    mirror="${ZAPRET2_RELEASE_MIRROR_BASE%/}/v${ver}/${tarfile}"
+    echo -e "${yellow}GitHub недоступен для $tarfile. Пробую зеркало zapret2 release.${plain}" >&2
+    if z2r_fetch_url_to_file "$dest" "$mirror"; then
+      return 0
+    fi
+    rm -f "$dest"
+  fi
+
+  yadisk="$(z2r_yandex_public_for_release "$ver" "$tarfile")"
+  if [ -n "$yadisk" ]; then
+    echo -e "${yellow}Пробую Яндекс.Диск для $tarfile.${plain}" >&2
+    if z2r_download_yandex_public_file "$dest" "$yadisk"; then
+      return 0
+    fi
+    rm -f "$dest"
+  fi
+
   return 1
 }
 
@@ -831,13 +901,46 @@ done
 
 #Скачивание, распаковка архива zapret2, очистка от ненуных бинарей
 zapret_get() {
+ local archive
+ local extract_dir
  if [[ "$OSystem" == "WRT" ]]; then
      tarfile="zapret2-v$VER-openwrt-embedded.tar.gz"
  else
      tarfile="zapret2-v$VER.tar.gz"
  fi
- curl -L "https://github.com/bol-van/zapret2/releases/download/v$VER/$tarfile" | tar -xz
- mv "zapret2-v$VER" zapret2
+
+ archive="/tmp/z2r_${tarfile}_$$"
+ if ! z2r_download_zapret2_release "$archive" "$VER" "$tarfile"; then
+     echo -e "${red}Не удалось скачать архив zapret2 $tarfile.${plain}"
+     echo -e "${yellow}Если есть зеркало release-архивов, задайте ZAPRET2_RELEASE_MIRROR_BASE с базовым URL вида https://mirror/path.${plain}"
+     rm -f "$archive"
+     return 1
+ fi
+ rm -rf zapret2 zapret2-v*
+ if ! tar -xzf "$archive"; then
+     echo -e "${red}Архив zapret2 повреждён или не является tar.gz: $tarfile.${plain}"
+     rm -f "$archive"
+     return 1
+ fi
+ rm -f "$archive"
+
+ if [ -d "zapret2-v$VER" ]; then
+     extract_dir="zapret2-v$VER"
+ else
+     extract_dir="$(find . -maxdepth 1 -type d -name 'zapret2-v*' | sed 's#^\./##' | head -n1)"
+ fi
+ if [ -z "$extract_dir" ] || [ ! -d "$extract_dir" ]; then
+     echo -e "${red}После распаковки не найден каталог zapret2-v*.${plain}"
+     return 1
+ fi
+ if [ "$extract_dir" != "zapret2-v$VER" ]; then
+     echo -e "${yellow}Используется архив zapret2 из Яндекс.Диска: $extract_dir вместо выбранной версии $VER.${plain}"
+ fi
+ mv "$extract_dir" zapret2
+ if [ ! -f /tmp/zapret2/install_bin.sh ] || [ ! -f /tmp/zapret2/install_easy.sh ]; then
+     echo -e "${red}Архив zapret2 распакован некорректно: нет install_bin.sh или install_easy.sh.${plain}"
+     return 1
+ fi
  sh /tmp/zapret2/install_bin.sh
  find /tmp/zapret2/binaries/* -maxdepth 0 -type d ! -name "$(basename "$(dirname "$(readlink /tmp/zapret2/nfq2/nfqws2)")")" -exec rm -rf {} +
  mv zapret2 /opt/zapret2
