@@ -664,7 +664,7 @@ z2r_install_bolvan_voice_scripts() {
 get_repo() {
   local fake_archive="/tmp/z2r_fake_files_$$.tar.gz"
 
-  mkdir -p /opt/zapret2/lists /opt/zapret2/extra_strats /opt/zapret2/extra_strats/cache
+  mkdir -p /opt/zapret2/lists /opt/zapret2/extra_strats /opt/zapret2/extra_strats/cache /opt/zapret2/files/fake
   mkdir -p /opt/zapret2/extra_strats/cache/orchestra
   chmod 777 /opt/zapret2/extra_strats/cache/orchestra 2>/dev/null || true
   locked_lua_update_from_repo || true
