@@ -470,7 +470,7 @@ fallback_profile_try() {
 fallback_http_profile_try() {
   local prev_lock_file="${ORCH_LOCK_FILE:-/opt/zapret2/extra_strats/cache/orchestra/locked.tsv}"
   ORCH_LOCK_FILE="/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
-  orch_profile_try "9" "Профиль 9: fallback HTTP (безразборный блок)" "http" "__HTTP_200_TORPROJECT__"
+  orch_profile_try "9" "Профиль 9: fallback HTTP (безразборный блок)" "http://deb.torproject.org/torproject.org"
   ORCH_LOCK_FILE="$prev_lock_file"
 }
 
