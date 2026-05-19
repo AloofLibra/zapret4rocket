@@ -121,7 +121,7 @@ orch_profile_try() {
 }
 
 get_orchestra_locks_info() {
-    local yt_tls="" gv_tls="" rkn_tls="" ds_tls="" yt_quic_udp="" voice_udp="" tg_tls=""
+    local yt_tls="" gv_tls="" rkn_tls="" ds_tls="" yt_quic_udp="" voice_udp="" tg_tls="" fb_http=""
     local v=""
     yt_tls="$(orch_locked_get 1 tls)"
     gv_tls="$(orch_locked_get 2 tls)"
@@ -130,6 +130,7 @@ get_orchestra_locks_info() {
     yt_quic_udp="$(orch_locked_get 5 udp)"
     voice_udp="$(orch_locked_get 6 udp)"
     tg_tls="$(orch_locked_get 7 tls)"
+    fb_http="$(orch_locked_get 9 http)"
 
     fmt_status_num() {
         v="${1:-0}"
@@ -140,14 +141,15 @@ get_orchestra_locks_info() {
         fi
     }
 
-    printf "YT_TLS=%s GV_TLS=%s RKN_TLS=%s DS_TLS=%s YT_QUIC_UDP=%s VOICE_UDP=%s TG_TLS=%s" \
+    printf "YT_TLS=%s GV_TLS=%s RKN_TLS=%s DS_TLS=%s YT_QUIC_UDP=%s VOICE_UDP=%s TG_TLS=%s FB_HTTP=%s" \
         "$(fmt_status_num "$yt_tls")" \
         "$(fmt_status_num "$gv_tls")" \
         "$(fmt_status_num "$rkn_tls")" \
         "$(fmt_status_num "$ds_tls")" \
         "$(fmt_status_num "$yt_quic_udp")" \
         "$(fmt_status_num "$voice_udp")" \
-        "$(fmt_status_num "$tg_tls")"
+        "$(fmt_status_num "$tg_tls")" \
+        "$(fmt_status_num "$fb_http")"
 }
 
 manage_custom_rkn_domain() {
