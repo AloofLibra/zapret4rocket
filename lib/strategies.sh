@@ -94,6 +94,13 @@ orch_profile_try() {
             else
                 echo "run_cdn_test недоступен, пропускаем проверку."
             fi
+        elif printf "%s" "$test_url" | grep -q '^http://'; then
+            echo "Проверка HTTP-доступа: $test_url"
+            if curl --max-time 2 -s -o /dev/null "$test_url"; then
+                echo -e "${green}Есть ответ по HTTP.${plain}"
+            else
+                echo -e "${yellow}Нет ответа по HTTP. Проверьте доступность вручную.${plain}"
+            fi
         elif [ -n "$test_url" ]; then
             echo "Проверка доступа: $test_url"
             check_access "$test_url"
