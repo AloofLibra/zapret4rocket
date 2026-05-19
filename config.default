@@ -351,6 +351,23 @@ NFQWS2_OPT="
 --lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1:strategy=28
 --lua-desync=send:repeats=2:strategy=29 --lua-desync=syndata:blob=google_www:strategy=29 --lua-desync=multisplit:seqovl=211:seqovl_pattern=tls5:strategy=29
   #Z2R_FALLBACK_END
+
+--new
+
+  #Z2R_FALLBACK_HTTP_BEGIN
+  #HTTP-часть безразборного блока (fallback). Отдельный профиль и отдельный подбор стратегий.
+--skip --filter-tcp=80 --filter-l7=http
+--hostlist-exclude=/opt/zapret2/lists/netrogat.txt
+--payload=http_req
+--out-range=-n19
+--lua-desync=circular_locked:key=9:allow_nohost=1
+--lua-desync=http_hostcase:spell=hoSt:strategy=1 --lua-desync=http_domcase:strategy=1
+--lua-desync=multisplit:pos=method+2,host+1,midsld:strategy=2
+--lua-desync=multidisorder:pos=method+2,host+1,midsld:strategy=3
+--lua-desync=fake:blob=fake_default_http:badsum:repeats=2:strategy=4 --lua-desync=multisplit:pos=method+2,host+1,midsld:strategy=4
+--lua-desync=fake:blob=fake_default_http:tcp_ts=-1000:repeats=2:strategy=5 --lua-desync=multidisorder:pos=method+2,host+1,midsld:strategy=5
+--lua-desync=multisplit:pos=method+2,host+1,midsld:seqovl=8:seqovl_pattern=0x474554202f204854:strategy=6
+  #Z2R_FALLBACK_HTTP_END
   
 "
 

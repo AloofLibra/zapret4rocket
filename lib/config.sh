@@ -113,12 +113,19 @@ config_profile_max_strategy() {
   local cfg
   cfg="$(config_get_file "$2")" || { echo 0; return 0; }
 
-  if [ "$profile" = "8" ]; then
-    local fallback_max
-    fallback_max="$(awk '
+  if [ "$profile" = "8" ] || [ "$profile" = "9" ]; then
+    local begin_marker end_marker fallback_max
+    if [ "$profile" = "9" ]; then
+      begin_marker="#Z2R_FALLBACK_HTTP_BEGIN"
+      end_marker="#Z2R_FALLBACK_HTTP_END"
+    else
+      begin_marker="#Z2R_FALLBACK_BEGIN"
+      end_marker="#Z2R_FALLBACK_END"
+    fi
+    fallback_max="$(awk -v begin="$begin_marker" -v end="$end_marker" '
         BEGIN{inblk=0; max=0}
-        /^[[:space:]]*#Z2R_FALLBACK_BEGIN/ {inblk=1; next}
-        /^[[:space:]]*#Z2R_FALLBACK_END/ {inblk=0; exit}
+        index($0, begin) {inblk=1; next}
+        index($0, end) {inblk=0; exit}
         inblk {
             line=$0
             while (match(line, /strategy=[0-9]+/)) {

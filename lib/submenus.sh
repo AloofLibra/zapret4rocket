@@ -6,13 +6,14 @@ strategies_submenu() {
   while true; do
     local strategies_status
     strategies_status=$(get_orchestra_locks_info)
-    local p1_max p2_max p3_max p4_max p5_max p6_max
+    local p1_max p2_max p3_max p4_max p5_max p6_max p9_max
     p1_max="$(orch_max_strategy_for_profile 1)"
     p2_max="$(orch_max_strategy_for_profile 2)"
     p3_max="$(orch_max_strategy_for_profile 3)"
     p4_max="$(orch_max_strategy_for_profile 4)"
     p5_max="$(orch_max_strategy_for_profile 5)"
     p6_max="$(orch_max_strategy_for_profile 6)"
+    p9_max="$(orch_max_strategy_for_profile 9)"
     clear
 
     echo -e "${cyan}--- Управление стратегиями ---${plain}"
@@ -26,8 +27,9 @@ strategies_submenu() {
     submenu_item "	4" "Профиль 4: TCP 80/443 (Discord) [${p4_max:-0}]" "tls"
     submenu_item "	5" "Профиль 5: UDP 443 (YouTube QUIC) [${p5_max:-0}]" "udp"
     submenu_item "	6" "Профиль 6: UDP Voice (Discord/STUN) [${p6_max:-0}]" "udp"
-    submenu_item "	8" "Fallback (безразборный блок)"
-    submenu_item "	9" "Добавить домен в RKN список (с/без подбора стратегии)"
+    submenu_item "	8" "Fallback TLS (безразборный блок)"
+    submenu_item "	9" "Fallback HTTP (безразборный блок) [${p9_max:-0}]"
+    submenu_item "	10" "Добавить домен в RKN список (с/без подбора стратегии)"
     submenu_item "	0" "Назад"
     echo ""
 
@@ -58,6 +60,9 @@ strategies_submenu() {
         fallback_profile_try
         ;;
       "9")
+        fallback_http_profile_try
+        ;;
+      "10")
         manage_custom_rkn_domain
         ;;
       "0"|"")

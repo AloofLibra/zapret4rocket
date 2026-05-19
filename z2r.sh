@@ -374,7 +374,7 @@ hostlist_mode_text() {
 fallback_mode_text() {
   local cfg="/opt/zapret2/config"
   if [ -f "$cfg" ]; then
-    if sed -n '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/p' "$cfg" | grep -q '^[[:space:]]*--skip[[:space:]]'; then
+    if { sed -n '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/p' "$cfg"; sed -n '/#Z2R_FALLBACK_HTTP_BEGIN/,/#Z2R_FALLBACK_HTTP_END/p' "$cfg"; } | grep -q '^[[:space:]]*--skip[[:space:]]'; then
       echo "выключен"
       return
     fi
@@ -423,6 +423,19 @@ fallback_strategy_text() {
   echo "не задана"
 }
 
+fallback_http_strategy_text() {
+  local file="/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
+  if [ -f "$file" ]; then
+    local val
+    val="$(awk -F '\t' '$1=="9" && $2=="http" && $3 ~ /^[0-9]+$/ {print $3; exit}' "$file")"
+    if [ -n "$val" ]; then
+      echo "$val"
+      return
+    fi
+  fi
+  echo "не задана"
+}
+
 set_fallback_strategy() {
   local file="/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
   local tmp="${file}.tmp"
@@ -451,6 +464,13 @@ fallback_profile_try() {
   local prev_lock_file="${ORCH_LOCK_FILE:-/opt/zapret2/extra_strats/cache/orchestra/locked.tsv}"
   ORCH_LOCK_FILE="/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
   orch_profile_try "8" "Профиль 8: fallback (безразборный блок)" "tls" "__RUN_CDN_TEST__"
+  ORCH_LOCK_FILE="$prev_lock_file"
+}
+
+fallback_http_profile_try() {
+  local prev_lock_file="${ORCH_LOCK_FILE:-/opt/zapret2/extra_strats/cache/orchestra/locked.tsv}"
+  ORCH_LOCK_FILE="/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
+  orch_profile_try "9" "Профиль 9: fallback HTTP (безразборный блок)" "http" "__HTTP_200_TORPROJECT__"
   ORCH_LOCK_FILE="$prev_lock_file"
 }
 
@@ -1385,7 +1405,7 @@ Enter (без цифр) - переустановка/обновление zapret
 '"${Fyellow}"'0.'"${yellow}"' Выход
 '"${Fcyan}"'001.'"${yellow}"' CDN тест (test.sh)
 '"${Fcyan}"'01.'"${yellow}"' Проверить доступность сервисов (Тест не точен)
-'"${Fcyan}"'1.'"${yellow}"' Фиксация стратегии профиля/безразборного блока. Текущие: '"${plain}"'[ '"${strategies_status}"' ]'"${yellow}"' (fallback: '"${plain}"'['"$(fallback_strategy_text)"']'"${yellow}"')
+'"${Fcyan}"'1.'"${yellow}"' Фиксация стратегии профиля/безразборного блока. Текущие: '"${plain}"'[ '"${strategies_status}"' ]'"${yellow}"' (fallback TLS: '"${plain}"'['"$(fallback_strategy_text)"']'"${yellow}"', HTTP: '"${plain}"'['"$(fallback_http_strategy_text)"']'"${yellow}"')
 '"${Fcyan}"'2.'"${yellow}"' Стоп/пере(запуск) zapret2 (сейчас: '"$(pidof nfqws2 >/dev/null && echo "${green}Запущен${yellow}" || echo "${red}Остановлен${yellow}")"')
 '"${Fcyan}"'3.'"${yellow}"' Запуск blockcheck2 и сохранение SUMMARY
 '"${Fcyan}"'4.'"${yellow}"' Удалить zapret2

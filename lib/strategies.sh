@@ -94,6 +94,16 @@ orch_profile_try() {
             else
                 echo "run_cdn_test недоступен, пропускаем проверку."
             fi
+        elif [ "$test_url" = "__HTTP_200_TORPROJECT__" ]; then
+            local http_url="http://deb.torproject.org/torproject.org"
+            local http_code=""
+            echo "Проверка доступа: $http_url (ожидается HTTP 200)"
+            http_code="$(curl -L -sS -o /dev/null -w '%{http_code}' --connect-timeout 8 --max-time 20 "$http_url" 2>/dev/null || echo 000)"
+            if [ "$http_code" = "200" ]; then
+                echo "HTTP 200: проверка пройдена."
+            else
+                echo "HTTP $http_code: провал, любой ответ кроме 200 считается нерабочим."
+            fi
         elif [ -n "$test_url" ]; then
             echo "Проверка доступа: $test_url"
             check_access "$test_url"
