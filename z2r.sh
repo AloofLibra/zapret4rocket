@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 
 set -e
 
@@ -1406,7 +1406,7 @@ Enter (без цифр) - переустановка/обновление zapret
 '"${Fcyan}"'001.'"${yellow}"' CDN тест (test.sh)
 '"${Fcyan}"'01.'"${yellow}"' Проверить доступность сервисов (Тест не точен)
 '"${Fcyan}"'1.'"${yellow}"' Фиксация стратегии профиля/безразборного блока. Текущие: '"${plain}"'[ '"${strategies_status}"' ]'"${yellow}"' (fallback TLS: '"${plain}"'['"$(fallback_strategy_text)"']'"${yellow}"', HTTP: '"${plain}"'['"$(fallback_http_strategy_text)"']'"${yellow}"')
-'"${Fcyan}"'2.'"${yellow}"' Стоп/пере(запуск) zapret2 (сейчас: '"$(pidof nfqws2 >/dev/null && echo "${green}Запущен${yellow}" || echo "${red}Остановлен${yellow}")"')
+'"${Fcyan}"'2.'"${yellow}"' Стоп/старт zapret2, 22 - рестарт (сейчас: '"$(pidof nfqws2 >/dev/null && echo "${green}Запущен${yellow}" || echo "${red}Остановлен${yellow}")"')
 '"${Fcyan}"'3.'"${yellow}"' Запуск blockcheck2 и сохранение SUMMARY
 '"${Fcyan}"'4.'"${yellow}"' Удалить zapret2
 '"${Fcyan}"'5.'"${yellow}"' Обновить стратегии, сбросить листы подбора стратегий и исключений (есть бэкап)
@@ -1465,9 +1465,16 @@ Enter (без цифр) - переустановка/обновление zapret
       ensure_nfqws2_stopped
       echo -e "${green}Выполнена команда остановки zapret2${plain}"
     else
-      "$ZAPRET2_INIT" restart
-      echo -e "${green}Выполнена команда перезапуска zapret2${plain}"
+      "$ZAPRET2_INIT" start
+      echo -e "${green}Выполнена команда запуска zapret2${plain}"
     fi
+    pause_enter
+    ;;
+
+  "22")
+    ensure_nfqws2_stopped
+    "$ZAPRET2_INIT" start
+    echo -e "${green}Выполнена быстрая перезагрузка zapret2 (остановка + запуск)${plain}"
     pause_enter
     ;;
 
