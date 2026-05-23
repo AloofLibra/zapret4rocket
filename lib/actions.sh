@@ -8,8 +8,12 @@ backup_strats() {
         get_menu # сигнал “отмена/в меню”
     fi
     if [ "$ans" = "5" ] || [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
+      touch /opt/zapret2/extra_strats/TCP_Custom.txt 2>/dev/null || true
       rm -rf /opt/extra_strats 2>/dev/null || true
       cp -rf /opt/zapret2/extra_strats /opt/ || true
+      if [ -f /opt/zapret2/extra_strats/TCP_Custom.txt ] && [ ! -f /opt/extra_strats/TCP_Custom.txt ]; then
+        cp -f /opt/zapret2/extra_strats/TCP_Custom.txt /opt/extra_strats/TCP_Custom.txt 2>/dev/null || true
+      fi
       echo -e "${green}Бэкап extra_strats сохранён в /opt/extra_strats${plain}"
     fi
   fi

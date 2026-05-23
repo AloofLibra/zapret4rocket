@@ -160,18 +160,18 @@ get_orchestra_locks_info() {
 }
 
 manage_custom_rkn_domain() {
-    local user_domain="" test_url="" rkn_file="" mode="" strategy_num=""
+    local user_domain="" test_url="" custom_file="" mode="" strategy_num=""
     local max_strat="" current_strat="" prev_strat="" answer=""
     local only_add=0
 
-    read -re -p "Введите домен для добавления в RKN-обработку (например, example.com): " user_domain
+    read -re -p "Введите домен для добавления в TCP_Custom (RKN-обработка, например example.com): " user_domain
     if [ -z "$user_domain" ]; then
         echo "Ввод пустой, ничего не добавлено."
         pause_enter
         return 0
     fi
 
-    echo "1 - только добавить домен в список RKN"
+    echo "1 - только добавить домен в список TCP_Custom"
     echo "2 - добавить и подобрать стратегию для этого домена"
     echo "0 - отмена"
     read -re -p "Ваш выбор: " mode
@@ -194,13 +194,14 @@ manage_custom_rkn_domain() {
             ;;
     esac
 
-    rkn_file="/opt/zapret2/extra_strats/TCP_RKN_list.txt"
+    custom_file="/opt/zapret2/extra_strats/TCP_Custom.txt"
     mkdir -p /opt/zapret2/extra_strats
-    if ! grep -Fxq "$user_domain" "$rkn_file" 2>/dev/null; then
-        echo "$user_domain" >> "$rkn_file"
-        echo -e "${green}Домен $user_domain добавлен в $rkn_file${plain}"
+    touch "$custom_file" 2>/dev/null || true
+    if ! grep -Fxq "$user_domain" "$custom_file" 2>/dev/null; then
+        echo "$user_domain" >> "$custom_file"
+        echo -e "${green}Домен $user_domain добавлен в $custom_file${plain}"
     else
-        echo -e "${yellow}Домен $user_domain уже есть в $rkn_file${plain}"
+        echo -e "${yellow}Домен $user_domain уже есть в $custom_file${plain}"
     fi
 
     if [ "$only_add" -eq 1 ]; then

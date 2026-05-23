@@ -29,7 +29,7 @@ strategies_submenu() {
     submenu_item "	6" "Профиль 6: UDP Voice (Discord/STUN) [${p6_max:-0}]" "udp"
     submenu_item "	8" "Fallback TLS (безразборный блок)"
     submenu_item "	9" "Fallback HTTP (безразборный блок) [${p9_max:-0}]"
-    submenu_item "	10" "Добавить домен в RKN список (с/без подбора стратегии)"
+    submenu_item "	10" "Добавить домен в TCP_Custom (RKN-обработка, с/без подбора стратегии)"
     submenu_item "	0" "Назад"
     echo ""
 

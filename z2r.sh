@@ -799,6 +799,7 @@ get_repo() {
   rm -f "$fake_archive"
   z2r_download_project_file /opt/zapret2/extra_strats/UDP_YT_list.txt "extra_strats/UDP/YT/List.txt" || return 1
   z2r_download_project_file /opt/zapret2/extra_strats/TCP_RKN_list.txt "extra_strats/TCP/RKN/List.txt" || return 1
+  z2r_download_project_file /opt/zapret2/extra_strats/TCP_Custom.txt "extra_strats/TCP/RKN/Custom.txt" || return 1
   z2r_download_project_file /opt/zapret2/extra_strats/TCP_YT_list.txt "extra_strats/TCP/YT/List.txt" || return 1
   z2r_download_project_file /opt/zapret2/extra_strats/TCP_Discord.txt "extra_strats/TCP/RKN/Discord.txt" || return 1
   if [ ! -f /opt/zapret2/files/fake/custom_tls.bin ]; then
@@ -812,6 +813,10 @@ get_repo() {
     rm -rf /opt/zapret2/extra_strats
     mv /opt/extra_strats /opt/zapret2/
     echo "Востановление настроек подбора из резерва выполнено."
+  fi
+  if [ ! -f /opt/zapret2/extra_strats/TCP_Custom.txt ]; then
+    mkdir -p /opt/zapret2/extra_strats
+    z2r_download_project_file /opt/zapret2/extra_strats/TCP_Custom.txt "extra_strats/TCP/RKN/Custom.txt" || touch /opt/zapret2/extra_strats/TCP_Custom.txt
   fi
   if [ -f "/opt/netrogat.txt" ]; then
     mv -f /opt/netrogat.txt /opt/zapret2/lists/netrogat.txt
