@@ -92,7 +92,8 @@ NFQWS2_OPT="
 
 #Стратегии для YT
 --qnum 300 --filter-tcp=443 --filter-l7=tls
---hostlist=/opt/zapret2/extra_strats/TCP_YT_list.txt 
+--hostlist=/opt/zapret2/extra_strats/TCP_YT_list.txt
+--hostlist-exclude=/opt/zapret2/lists/netrogat.txt 
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello  
 --out-range=-s34228 
 --in-range=-s32768 --lua-desync=circular_locked:key=1
@@ -133,6 +134,7 @@ NFQWS2_OPT="
 #Z2R_TCP443_BEGIN
 --filter-tcp=443 --filter-l7=tls
 --hostlist-domains=googlevideo.com
+--hostlist-exclude=/opt/zapret2/lists/netrogat.txt
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello 
 --out-range=-s342 
 --in-range=-s32768 --lua-desync=circular_locked:key=2
@@ -176,6 +178,7 @@ NFQWS2_OPT="
 --hostlist=/opt/zapret2/extra_strats/TCP_RKN_list.txt
 --hostlist=/opt/zapret2/extra_strats/TCP_Custom.txt
 --hostlist-exclude=/opt/zapret2/extra_strats/TCP_Discord.txt
+--hostlist-exclude=/opt/zapret2/lists/netrogat.txt
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello
 --out-range=-s34228
 --in-range=-s32768 --lua-desync=circular_locked:key=3
@@ -215,6 +218,7 @@ NFQWS2_OPT="
 
 #Отдельные стратегии для TCP_Discord
 --filter-tcp=80,443,2053,2083,2087,2096,8443 --hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt
+--hostlist-exclude=/opt/zapret2/lists/netrogat.txt
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello 
 --out-range=-s34228 
 --in-range=-s32768 --lua-desync=circular_locked:key=4
@@ -253,6 +257,7 @@ NFQWS2_OPT="
 
 #Стратегии для UDP_YT
 --filter-udp=443 --hostlist=/opt/zapret2/extra_strats/UDP_YT_list.txt
+--hostlist-exclude=/opt/zapret2/lists/netrogat.txt
 --in-range=-d100
 --out-range=-d100
 --lua-desync=circular_locked:key=5 
@@ -260,7 +265,6 @@ NFQWS2_OPT="
 --payload=quic_initial
 --blob=quic_google:@/opt/zapret2/files/fake/quic_initial_www_google_com.bin
 --blob=quic5:@/opt/zapret2/files/fake/quic_5.bin
-
 --lua-desync=fake:blob=quic5:repeats=3:strategy=1
 --lua-desync=udplen:increment=4:strategy=2 --lua-desync=fake:blob=quic5:repeats=2:strategy=2
 --lua-desync=udplen:increment=8:pattern=0xFEA82025:strategy=3 --lua-desync=fake:blob=quic5:repeats=2:strategy=3
@@ -280,6 +284,7 @@ NFQWS2_OPT="
 #Стратегии для голосовой связи. В первую очередь Discord, но может ещё для чего поможет
 --filter-udp=443,2053,2083,2087,2096,8443,50000-50099,1400,3478-3481,5349,19294-19344
 --filter-l7=discord,stun
+--hostlist-exclude=/opt/zapret2/lists/netrogat.txt
 --lua-desync=circular_locked:key=6:allow_nohost=1
 --payload=discord_ip_discovery,stun
 --lua-desync=fake:blob=0x00000000000000000000000000000000:repeats=2:out_range=-d10:strategy=1
