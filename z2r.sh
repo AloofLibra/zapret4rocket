@@ -1137,6 +1137,31 @@ webui_ensure_server_binary() {
   return 0
 }
 
+webui_ensure_runtime_deps() {
+  if PATH="$WEBUI_PATH" command -v nohup >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if command -v opkg >/dev/null 2>&1; then
+    PATH="$WEBUI_PATH" opkg install coreutils-nohup 2>/dev/null || true
+  elif command -v apk >/dev/null 2>&1; then
+    apk add coreutils 2>/dev/null || true
+  elif command -v apt-get >/dev/null 2>&1; then
+    apt-get update 2>/dev/null || true
+    apt-get install -y coreutils 2>/dev/null || true
+  elif command -v pacman >/dev/null 2>&1; then
+    pacman -Sy --noconfirm coreutils 2>/dev/null || true
+  fi
+
+  if ! PATH="$WEBUI_PATH" command -v nohup >/dev/null 2>&1; then
+    echo -e "${red}Не удалось найти или установить nohup для web UI.${plain}"
+    [ "$OSystem" = "entware" ] && echo -e "${yellow}Для Keenetic/Entware нужен пакет coreutils-nohup.${plain}"
+    return 1
+  fi
+
+  return 0
+}
+
 webui_install_files() {
   mkdir -p "$WEBUI_ROOT" "$WEBUI_WWW" "$WEBUI_CGI" "$WEBUI_STATUS_CACHE"
 
@@ -1306,6 +1331,7 @@ webui_show_status() {
 }
 
 webui_install() {
+  webui_ensure_runtime_deps || return 1
   webui_ensure_server_binary || return 1
   webui_install_files || return 1
   webui_install_service || return 1
@@ -1654,10 +1680,10 @@ fi
  
 #entware keenetic and merlin preinstal env.
 if [ "$hardware" = "keenetic" ]; then
- opkg install coreutils-sort grep gzip ipset iptables xtables-addons_legacy 2>/dev/null || apk add coreutils-sort grep gzip ipset iptables xtables-addons_legacy 2>/dev/null
+ opkg install coreutils-sort coreutils-nohup grep gzip ipset iptables xtables-addons_legacy 2>/dev/null || apk add coreutils grep gzip ipset iptables xtables-addons_legacy 2>/dev/null
  opkg install kmod_ndms 2>/dev/null || apk add kmod_ndms 2>/dev/null || echo -e "\033[31mНе удалось установить kmod_ndms. Если у вас не keenetic - игнорируйте.\033[0m"
 elif [ "$hardware" = "merlin" ]; then
- opkg install coreutils-sort grep gzip ipset iptables xtables-addons_legacy 2>/dev/null || apk add coreutils-sort grep gzip ipset iptables xtables-addons_legacy 2>/dev/null
+ opkg install coreutils-sort coreutils-nohup grep gzip ipset iptables xtables-addons_legacy 2>/dev/null || apk add coreutils grep gzip ipset iptables xtables-addons_legacy 2>/dev/null
 fi
 
 #Проверка наличия каталога opt и его создание при необходиомости (для некоторых роутеров), переход в tmp
