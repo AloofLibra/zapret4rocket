@@ -506,6 +506,9 @@ ensure_nfqws2_stopped() {
 
 blockcheck2_run_summary() {
   local blockcheck_path="/opt/zapret2/blockcheck2.sh"
+  local test_name="z4r"
+  local default_target="static.rutracker.cc/templates/v1/min/4e695e8ea9cf5a1dcc7aed231b887c51.lib.min.js"
+  local test_target="${Z2R_BLOCKCHECK2_DOMAINS:-$default_target}"
   local log_dir="/opt/zapret2/extra_strats/cache/blockcheck2"
   local provider_file="/opt/zapret2/extra_strats/cache/provider.txt"
   local provider_label="" provider_sanitized="" ts=""
@@ -519,6 +522,8 @@ blockcheck2_run_summary() {
     echo -e "${red}blockcheck2.sh не найден или не исполняемый: $blockcheck_path${plain}"
     return 1
   fi
+
+  blockcheck2_prepare_z4r_test || return 1
 
   if pidof nfqws2 >/dev/null; then
     was_running=1
@@ -541,16 +546,9 @@ blockcheck2_run_summary() {
   summary_file="$log_dir/blockcheck2_${provider_sanitized}_${ts}_${uuid_suffix}.summary"
   summary_public="/opt/zapret2/blockcheck2_summary.txt"
 
-  local domains_override=""
-  read -re -p "Введите домен/URL для теста blockcheck2 (Enter - по умолчанию): " domains_override
-
-  echo -e "${yellow}Запускаю blockcheck2 (BATCH=1)...${plain}"
+  echo -e "${yellow}Запускаю blockcheck2 TEST=$test_name для $test_target...${plain}"
   start_ts="$(date +%s)"
-  if [ -n "$domains_override" ]; then
-    CURL_HTTPS_GET=1 BATCH=1 DOMAINS="$domains_override" BC2_PROGRESS_FILE="$progress_file" ZAPRET_BASE=/opt/zapret2 "$blockcheck_path" >"$log_file" 2>&1 &
-  else
-    CURL_HTTPS_GET=1 BATCH=1 BC2_PROGRESS_FILE="$progress_file" ZAPRET_BASE=/opt/zapret2 "$blockcheck_path" >"$log_file" 2>&1 &
-  fi
+  CURL_HTTPS_GET=1 BATCH=1 TEST="$test_name" DOMAINS="$test_target" ENABLE_HTTP=0 ENABLE_HTTPS_TLS12=1 ENABLE_HTTPS_TLS13=1 ENABLE_HTTP3=0 BC2_PROGRESS_FILE="$progress_file" ZAPRET_BASE=/opt/zapret2 "$blockcheck_path" >"$log_file" 2>&1 &
   pid=$!
   if [ "$pid" -gt 0 ]; then
     local spin='|/-\' idx=0 pct=0 elapsed=0 elapsed_fmt="" overrun_notice=0
@@ -619,6 +617,25 @@ blockcheck2_run_summary() {
   fi
 
   return $rc
+}
+
+blockcheck2_prepare_z4r_test() {
+  local test_dir="/opt/zapret2/blockcheck2.d/z4r"
+  local src_dir="$SCRIPT_DIR/blockcheck2.d/z4r"
+  local file dest
+
+  mkdir -p "$test_dir" || return 1
+  for file in 10-list.sh list_https_tls12.txt list_https_tls13.txt; do
+    dest="$test_dir/$file"
+    if [ -f "$src_dir/$file" ]; then
+      cp -f "$src_dir/$file" "$dest" || return 1
+    elif ! z2r_download_project_file "$dest" "blockcheck2.d/z4r/$file" && [ ! -s "$dest" ]; then
+      echo -e "${red}Не удалось установить blockcheck2.d/z4r/$file${plain}"
+      return 1
+    fi
+  done
+  chmod +x "$test_dir/10-list.sh" 2>/dev/null || true
+  return 0
 }
 
 blockcheck2_progress_percent() {
@@ -802,6 +819,7 @@ get_repo() {
   z2r_download_project_file /opt/zapret2/extra_strats/TCP_Custom.txt "extra_strats/TCP/RKN/Custom.txt" || return 1
   z2r_download_project_file /opt/zapret2/extra_strats/TCP_YT_list.txt "extra_strats/TCP/YT/List.txt" || return 1
   z2r_download_project_file /opt/zapret2/extra_strats/TCP_Discord.txt "extra_strats/TCP/RKN/Discord.txt" || return 1
+  blockcheck2_prepare_z4r_test || return 1
   if [ ! -f /opt/zapret2/files/fake/custom_tls.bin ]; then
     mkdir -p /opt/zapret2/files/fake
     if ! z2r_download_project_file /opt/zapret2/files/fake/custom_tls.bin "fake/custom_tls.bin"; then
