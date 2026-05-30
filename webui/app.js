@@ -2,6 +2,7 @@ const state = {
   meta: {},
   locks: [],
   status: null,
+  strategyChecks: {},
 };
 
 const views = {
@@ -160,12 +161,29 @@ function renderStrategies() {
     const form = node.querySelector('.lock-form');
     const submitButton = form.querySelector('button[type="submit"]');
     const clearButton = node.querySelector('.clear-lock');
+    const inlineCheck = node.querySelector('.inline-check');
+    const stepButtons = node.querySelectorAll('.step-strategy');
 
     input.min = '1';
     input.max = String(profile.max_strategy);
     if (profile.current_lock && profile.current_lock !== '0') {
       input.value = profile.current_lock;
     }
+    if (state.strategyChecks[profile.profile]) {
+      renderInlineCheck(inlineCheck, state.strategyChecks[profile.profile]);
+    }
+
+    stepButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const step = Number(button.dataset.step || 0);
+        const min = Number(input.min || 1);
+        const max = Number(input.max || profile.max_strategy || min);
+        const current = Number(input.value || profile.current_lock || min);
+        const next = Math.min(max, Math.max(min, current + step));
+        input.value = String(next);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    });
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -175,12 +193,14 @@ function renderStrategies() {
         return;
       }
       try {
-        await withBusy(submitButton, 'Сохранение...', async () => {
-          await api('/cgi-bin/set-lock.cgi', {
+        let payload = null;
+        await withBusy(submitButton, 'Сохранение и проверка...', async () => {
+          payload = await api('/cgi-bin/set-lock.cgi', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({ profile: profile.profile, strategy: value }),
           });
+          state.strategyChecks[profile.profile] = payload?.check;
           await refreshAll();
         });
         showBanner(`Стратегия ${value} сохранена для ${profile.label}.`);
@@ -197,6 +217,7 @@ function renderStrategies() {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({ profile: profile.profile }),
           });
+          delete state.strategyChecks[profile.profile];
           await refreshAll();
         });
         showBanner(`Lock снят для ${profile.label}.`);
@@ -226,12 +247,43 @@ function renderChecks(payload) {
   const results = Array.isArray(payload?.results) ? payload.results : [];
   if (!results.length) {
     container.classList.add('empty');
-    container.textContent = 'Нет результатов проверки.';
+    container.textContent = payload?.message || 'Нет результатов проверки.';
     return;
   }
 
   container.classList.remove('empty');
 
+  results.forEach((item) => {
+    const article = document.createElement('article');
+    article.className = 'check-item';
+
+    const title = document.createElement('div');
+    title.className = 'check-title';
+    appendText(title, 'strong', item.label || 'Цель');
+    appendText(title, 'span', item.target || '');
+
+    const pair = document.createElement('div');
+    pair.className = 'check-pair';
+    appendText(pair, 'span', `TLS 1.2: ${item.tls12 ? 'OK' : 'FAIL'}`, item.tls12 ? 'ok' : 'bad');
+    appendText(pair, 'span', `TLS 1.3: ${item.tls13 ? 'OK' : 'FAIL'}`, item.tls13 ? 'ok' : 'bad');
+
+    article.append(title, pair);
+    container.appendChild(article);
+  });
+}
+
+function renderInlineCheck(container, payload) {
+  if (!container) return;
+  container.innerHTML = '';
+
+  const results = Array.isArray(payload?.results) ? payload.results : [];
+  if (!results.length) {
+    container.classList.remove('empty');
+    container.textContent = payload?.message || 'Нет результатов быстрой проверки.';
+    return;
+  }
+
+  container.classList.remove('empty');
   results.forEach((item) => {
     const article = document.createElement('article');
     article.className = 'check-item';

@@ -479,6 +479,38 @@ input {
   min-width: 0;
 }
 
+.number-stepper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2.8rem;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.stepper-buttons {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 6px;
+}
+
+.stepper-buttons button {
+  border-radius: var(--radius-sm);
+  padding: 0;
+  min-height: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.inline-check {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.inline-check.empty {
+  display: none;
+}
+
 input:focus,
 select:focus,
 button:focus-visible {

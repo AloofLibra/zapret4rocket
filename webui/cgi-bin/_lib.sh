@@ -102,12 +102,19 @@ orch_max_strategy_for_profile() {
   config_profile_max_strategy "$1" "$CONFIG_FILE"
 }
 
-profile_proto() {
+profile_proto_list() {
   case "$1" in
-    1|2|3|4) echo "tls" ;;
+    1) echo "tls http" ;;
+    2|3|4) echo "tls" ;;
     5|6) echo "udp" ;;
     *) echo "" ;;
   esac
+}
+
+profile_proto() {
+  local list
+  list="$(profile_proto_list "$1")"
+  echo "${list%% *}"
 }
 
 profile_json() {
@@ -182,6 +189,31 @@ check_one_target_json() {
     "$(json_escape "$label")" "$(json_escape "$target")" "$tls12" "$tls13"
 }
 
+profile_check_json() {
+  local profile="$1" gv
+  case "$profile" in
+    1)
+      printf '{"results":[%s]}' "$(check_one_target_json "YouTube" "https://www.youtube.com/")"
+      ;;
+    2)
+      gv="$(get_yt_cluster_domain)"
+      printf '{"results":[%s]}' "$(check_one_target_json "Googlevideo" "https://${gv}")"
+      ;;
+    3)
+      printf '{"results":[%s]}' "$(check_one_target_json "Blocked Sites" "https://meduza.io")"
+      ;;
+    4)
+      printf '{"results":[%s]}' "$(check_one_target_json "Discord" "https://discord.com/")"
+      ;;
+    5|6)
+      printf '{"results":[],"message":"%s"}' "$(json_escape "Для UDP-профиля быстрая TLS-проверка неприменима. Проверьте работу в браузере или приложении.")"
+      ;;
+    *)
+      printf '{"results":[]}'
+      ;;
+  esac
+}
+
 api_meta() {
   send_json "200 OK" "{\"profiles\":$(all_profiles_json)}"
 }
@@ -203,22 +235,27 @@ api_set_lock() {
   parse_params
   [[ "${PARAM_PROFILE:-}" =~ ^[1-7]$ ]] || send_error "400 Bad Request" "Некорректный профиль"
   [[ "${PARAM_STRATEGY:-}" =~ ^[0-9]+$ ]] || send_error "400 Bad Request" "Некорректная стратегия"
-  local max proto
+  local max proto_list p check_json
   max="$(orch_max_strategy_for_profile "$PARAM_PROFILE")"
   [ "${PARAM_STRATEGY}" -ge 1 ] && [ "${PARAM_STRATEGY}" -le "${max:-0}" ] || send_error "400 Bad Request" "Стратегия вне диапазона"
-  proto="$(profile_proto "$PARAM_PROFILE")"
-  [ -n "$proto" ] || send_error "400 Bad Request" "Не удалось определить протокол профиля"
-  orch_locked_set "$PARAM_PROFILE" "$proto" "$PARAM_STRATEGY"
-  send_json "200 OK" "{\"ok\":true}"
+  proto_list="$(profile_proto_list "$PARAM_PROFILE")"
+  [ -n "$proto_list" ] || send_error "400 Bad Request" "Не удалось определить протокол профиля"
+  for p in $proto_list; do
+    orch_locked_set "$PARAM_PROFILE" "$p" "$PARAM_STRATEGY"
+  done
+  check_json="$(profile_check_json "$PARAM_PROFILE")"
+  send_json "200 OK" "{\"ok\":true,\"check\":$check_json}"
 }
 
 api_clear_lock() {
   parse_params
   [[ "${PARAM_PROFILE:-}" =~ ^[1-7]$ ]] || send_error "400 Bad Request" "Некорректный профиль"
-  local proto
-  proto="$(profile_proto "$PARAM_PROFILE")"
-  [ -n "$proto" ] || send_error "400 Bad Request" "Не удалось определить протокол профиля"
-  orch_locked_clear "$PARAM_PROFILE" "$proto"
+  local proto_list p
+  proto_list="$(profile_proto_list "$PARAM_PROFILE")"
+  [ -n "$proto_list" ] || send_error "400 Bad Request" "Не удалось определить протокол профиля"
+  for p in $proto_list; do
+    orch_locked_clear "$PARAM_PROFILE" "$p"
+  done
   send_json "200 OK" "{\"ok\":true}"
 }
 

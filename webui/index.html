@@ -107,8 +107,15 @@
       <form class="lock-form">
         <label>
           <span>Номер стратегии</span>
-          <input type="number" min="1" step="1" required>
+          <div class="number-stepper">
+            <input type="number" min="1" step="1" required>
+            <div class="stepper-buttons">
+              <button type="button" class="step-strategy" data-step="1" aria-label="Увеличить номер стратегии">↑</button>
+              <button type="button" class="step-strategy" data-step="-1" aria-label="Уменьшить номер стратегии">↓</button>
+            </div>
+          </div>
         </label>
+        <div class="inline-check empty"></div>
         <div class="card-actions">
           <button type="submit" class="primary">Сохранить</button>
           <button type="button" class="ghost clear-lock">Сбросить</button>
