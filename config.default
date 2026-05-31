@@ -292,7 +292,7 @@ NFQWS2_OPT="
 --blob=stun_fake:@/opt/zapret2/files/fake/stun.bin
 --lua-desync=circular_locked:key=6:allow_nohost=1
 --payload=discord_ip_discovery,stun
---lua-desync=fake:blob=0x00000000000000000000000000000000:repeats=2:out_range=-d10:strategy=1
+--lua-desync=fake:blob=stun_fake:repeats=3:strategy=3 --lua-desync=fake:blob=discord_fake:repeats=3:strategy=3
 --lua-desync=fake:blob=0x00:out_range=-d10:strategy=2
 --lua-desync=fake:blob=discord_fake:repeats=6:strategy=3
 --lua-desync=fake:blob=discord_fake:ipfrag_pos_udp=8:ipfrag_disorder:repeats=6:strategy=4
