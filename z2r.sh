@@ -345,6 +345,7 @@ set_zapret2_init() {
 
 ORCH_DIR="/opt/zapret2/extra_strats/cache/orchestra"
 ORCH_LUA_LOCKED="/opt/zapret2/lua/locked.lua"
+RST_GUARD_LUA="/opt/zapret2/lua/rst-guard.lua"
 
 locked_lua_update_from_repo() {
   local tmp="${ORCH_LUA_LOCKED}.tmp"
@@ -359,11 +360,28 @@ locked_lua_update_from_repo() {
   echo -e "${green}locked.lua обновлен из репозитория.${plain}"
 }
 
+rst_guard_lua_update_from_repo() {
+  local tmp="${RST_GUARD_LUA}.tmp"
+
+  mkdir -p "$(dirname "$RST_GUARD_LUA")"
+  if ! z2r_download_project_file "$tmp" "lua/rst-guard.lua"; then
+    echo -e "${red}Не удалось скачать rst-guard.lua.${plain}"
+    return 1
+  fi
+
+  mv "$tmp" "$RST_GUARD_LUA"
+  echo -e "${green}rst-guard.lua обновлен из репозитория.${plain}"
+}
+
 # Проверяем locked.lua, при отсутствии пробуем скачать из репозитория
 if [ -f /opt/zapret2/config ]; then
   if [ ! -s "$ORCH_LUA_LOCKED" ]; then
     echo "Не найден locked.lua. Пытаюсь скачать из репозитория..."
     locked_lua_update_from_repo || true
+  fi
+  if [ ! -s "$RST_GUARD_LUA" ]; then
+    echo "Не найден rst-guard.lua. Пытаюсь скачать из репозитория..."
+    rst_guard_lua_update_from_repo || true
   fi
 fi
 
@@ -379,6 +397,21 @@ fallback_mode_text() {
       return
     fi
     if sed -n '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/p' "$cfg" | grep -q '^[[:space:]]*--filter-tcp=443 --filter-l7=tls'; then
+      echo "включен"
+      return
+    fi
+  fi
+  echo "неизвестно"
+}
+
+rst_guard_mode_text() {
+  local cfg="/opt/zapret2/config"
+  if [ -f "$cfg" ]; then
+    if sed -n '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/p' "$cfg" | grep -q '^[[:space:]]*--skip[[:space:]]'; then
+      echo "выключен"
+      return
+    fi
+    if sed -n '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/p' "$cfg" | grep -q '^[[:space:]]*--qnum 300 --filter-tcp='; then
       echo "включен"
       return
     fi
@@ -805,6 +838,7 @@ get_repo() {
   mkdir -p /opt/zapret2/extra_strats/cache/orchestra
   chmod 777 /opt/zapret2/extra_strats/cache/orchestra 2>/dev/null || true
   locked_lua_update_from_repo || true
+  rst_guard_lua_update_from_repo || true
   for listfile in cloudflare-ipset.txt cloudflare-ipset_v6.txt netrogat.txt russia-discord.txt russia-youtube-rtmps.txt russia-youtube.txt russia-youtubeQ.txt tg_cidr.txt; do
     z2r_download_project_file "/opt/zapret2/lists/$listfile" "lists/$listfile" || return 1
   done
@@ -1480,6 +1514,7 @@ Enter (без цифр) - переустановка/обновление zapret
 '"${Fcyan}"'14.'"${yellow}"' Активировать доступ в меню через браузер (~3мб места)
 '"${Fcyan}"'15.'"${yellow}"' Провайдер
 '"${Fcyan}"'16.'"${yellow}"' Сменить TLS blob (--blob=maxru). Сейчас: '"${plain}"'['"$(tls_blob_menu_text)"']'"${yellow}"'
+'"${Fcyan}"'18.'"${yellow}"' Защита от RST-инъекций. (BETA) Сейчас: '"${plain}"'['"$(rst_guard_mode_text)"']'"${yellow}"'
 '"${Fcyan}"'777.'"${yellow}"' Активировать zeefeer premium (Нажимать только Valery ProD, avg97, Xoz, GeGunT, blagodarenya, mikhyan, Xoz, andric62, Whoze, Necronicle, Andrei_5288515371, Nomand, Dina_turat, Nergalss, Александру, АлександруП, vecheromholodno, ЕвгениюГ, Dyadyabo, skuwakin, izzzgoy, Grigaraz, Reconnaissance, comandante1928, umad, rudnev2028, rutakote, railwayfx, vtokarev1604, Grigaraz, a40letbezurojaya и subzeero452 и остальным поддержавшим проект. Но если очень хочется - можно нажать и другим)\033[0m'
     echo -e "${Bred}${Fplain}17. Не знаешь, с чего начать? Есть проблемы? Жми сюда!${plain}"
 	if [[ -f "$PREMIUM_FLAG" ]]; then
@@ -1635,6 +1670,16 @@ Enter (без цифр) - переустановка/обновление zapret
 	
   "17")
     beginner_guide_menu
+    ;;
+
+  "18")
+    toggle_rst_guard_mode
+    if pidof nfqws2 >/dev/null; then
+      "$ZAPRET2_INIT" restart
+      echo -e "${green}zapret2 перезапущен для применения RST-защиты${plain}"
+    fi
+    echo -e "${green}RST-защита: $(rst_guard_mode_text).${plain}"
+    pause_enter
     ;;
 
   "777")

@@ -83,12 +83,20 @@ NFQWS2_UDP_PKT_IN=3
 NFQWS2_OPT="
 
 --lua-init=@/opt/zapret2/lua/locked.lua
+--lua-init=@/opt/zapret2/lua/rst-guard.lua
 --blob=maxru:@/opt/zapret2/files/fake/tls_clienthello_max_ru.bin
 --blob=google_www:@/opt/zapret2/files/fake/tls_clienthello_www_google_com.bin
 --blob=tls4:@/opt/zapret2/files/fake/tls_clienthello_4.bin
 --blob=custom:@/opt/zapret2/files/fake/custom_tls.bin
 --blob=tls5:@/opt/zapret2/files/fake/tls_clienthello_5.bin
 
+#Z2R_RST_GUARD_BEGIN
+#Защита от подозрительных входящих TCP RST. Экспериментальный профиль, включается из меню.
+--skip --qnum 300 --filter-tcp=80,443,2053,2083,2087,2096,8443
+--in-range=-n10 --lua-desync=rst_guard:ttl_delta=3
+#Z2R_RST_GUARD_END
+
+--new
 
 #Стратегии для YT
 --qnum 300 --filter-tcp=443 --filter-l7=tls
