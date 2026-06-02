@@ -95,4 +95,13 @@ function rst_guard(ctx, desync)
     return VERDICT_PASS
 end
 
+function rst_guard_locked(ctx, desync)
+    local verdict = rst_guard(ctx, desync)
+    if verdict == VERDICT_DROP then
+        return verdict
+    end
+
+    return circular_locked(ctx, desync)
+end
+
 DLOG("rst-guard loaded")

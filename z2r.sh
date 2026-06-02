@@ -407,18 +407,12 @@ fallback_mode_text() {
 rst_guard_mode_text() {
   local cfg="/opt/zapret2/config"
   if [ -f "$cfg" ]; then
-    if ! sed -n '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/p' "$cfg" | grep -q '#Z2R_RST_GUARD_BEGIN'; then
-      echo "нет профиля"
-      return
-    fi
-    if sed -n '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/p' "$cfg" | grep -q '^[[:space:]]*--skip[[:space:]]'; then
-      echo "выключен"
-      return
-    fi
-    if sed -n '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/p' "$cfg" | grep -q '^[[:space:]]*--qnum 300 --filter-tcp='; then
+    if grep -q -- '--lua-desync=rst_guard_locked:key=' "$cfg"; then
       echo "включен"
       return
     fi
+    echo "выключен"
+    return
   fi
   echo "нет config"
 }

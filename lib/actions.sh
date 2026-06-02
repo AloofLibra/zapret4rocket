@@ -345,9 +345,34 @@ toggle_fallback_mode() {
   done
 }
 
+rst_guard_remove_profile_block() {
+  local cfg="$1"
+  local tmp="${cfg}.rst_guard.tmp"
+
+  awk '
+    BEGIN {
+      in_block = 0
+    }
+    $0 ~ /^[[:space:]]*#Z2R_RST_GUARD_BEGIN[[:space:]]*$/ {
+      in_block = 1
+      next
+    }
+    in_block {
+      if ($0 ~ /^[[:space:]]*#Z2R_RST_GUARD_END[[:space:]]*$/) {
+        in_block = 0
+      }
+      next
+    }
+    {
+      print
+    }
+  ' "$cfg" > "$tmp" && mv "$tmp" "$cfg"
+}
+
 toggle_rst_guard_mode() {
   local cfg="/opt/zapret2/config"
   local enable=1
+  local key
 
   if type rst_guard_lua_update_from_repo >/dev/null 2>&1 && [ ! -s /opt/zapret2/lua/rst-guard.lua ]; then
     rst_guard_lua_update_from_repo || true
@@ -358,18 +383,25 @@ toggle_rst_guard_mode() {
     return 1
   fi
 
-  if ! sed -n '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/p' "$cfg" | grep -q '#Z2R_RST_GUARD_BEGIN'; then
-    echo -e "${yellow}В /opt/zapret2/config нет профиля RST-защиты. Обновите конфиг или добавьте блок #Z2R_RST_GUARD_BEGIN вручную.${plain}"
-    return 1
+  if grep -q '#Z2R_RST_GUARD_BEGIN' "$cfg"; then
+    rst_guard_remove_profile_block "$cfg" || {
+      rm -f "${cfg}.rst_guard.tmp"
+      echo -e "${red}Не удалось удалить старый отдельный профиль RST-защиты.${plain}"
+      return 1
+    }
   fi
 
-  if ! sed -n '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/p' "$cfg" | grep -q '^[[:space:]]*--skip[[:space:]]'; then
+  if grep -q -- '--lua-desync=rst_guard_locked:key=' "$cfg"; then
     enable=0
   fi
 
   if [ "$enable" -eq 1 ]; then
-    sed -i '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/ s/^[[:space:]]*--skip[[:space:]]\+//' "$cfg"
+    for key in 1 2 3 4 8 9; do
+      sed -i "s/--lua-desync=circular_locked:key=$key/--lua-desync=rst_guard_locked:key=$key/g" "$cfg"
+    done
   else
-    sed -i '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/ s/^[[:space:]]*--qnum 300 --filter-tcp=/--skip --qnum 300 --filter-tcp=/' "$cfg"
+    for key in 1 2 3 4 8 9; do
+      sed -i "s/--lua-desync=rst_guard_locked:key=$key/--lua-desync=circular_locked:key=$key/g" "$cfg"
+    done
   fi
 }
