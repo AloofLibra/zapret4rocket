@@ -345,30 +345,6 @@ toggle_fallback_mode() {
   done
 }
 
-rst_guard_remove_profile_block() {
-  local cfg="$1"
-  local tmp="${cfg}.rst_guard.tmp"
-
-  awk '
-    BEGIN {
-      in_block = 0
-    }
-    $0 ~ /^[[:space:]]*#Z2R_RST_GUARD_BEGIN[[:space:]]*$/ {
-      in_block = 1
-      next
-    }
-    in_block {
-      if ($0 ~ /^[[:space:]]*#Z2R_RST_GUARD_END[[:space:]]*$/) {
-        in_block = 0
-      }
-      next
-    }
-    {
-      print
-    }
-  ' "$cfg" > "$tmp" && mv "$tmp" "$cfg"
-}
-
 toggle_rst_guard_mode() {
   local cfg="/opt/zapret2/config"
   local enable=1
@@ -381,14 +357,6 @@ toggle_rst_guard_mode() {
   if [ ! -f "$cfg" ]; then
     echo -e "${red}Не найден $cfg.${plain}"
     return 1
-  fi
-
-  if grep -q '#Z2R_RST_GUARD_BEGIN' "$cfg"; then
-    rst_guard_remove_profile_block "$cfg" || {
-      rm -f "${cfg}.rst_guard.tmp"
-      echo -e "${red}Не удалось удалить старый отдельный профиль RST-защиты.${plain}"
-      return 1
-    }
   fi
 
   if grep -q -- '--lua-desync=rst_guard_locked:key=' "$cfg"; then

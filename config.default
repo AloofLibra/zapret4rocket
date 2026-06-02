@@ -338,10 +338,11 @@ NFQWS2_OPT="
   #Безразборный блок (fallback).
 --skip --filter-tcp=443 --filter-l7=tls
 --hostlist-exclude=/opt/zapret2/lists/netrogat.txt
---payload=tls_client_hello
+--payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello
 --out-range=-s3422
 --in-range=-s32768 --lua-desync=circular_locked:key=8:allow_nohost=1
 --in-range=x
+--payload=tls_client_hello
 --lua-desync=fake:blob=fake_default_tls:tcp_ts=-1000:repeats=2:strategy=1 --lua-desync=multisplit:pos=1,midsld:strategy=1
 --lua-desync=multisplit:blob=fake_default_tls:tcp_ts=-500:pos=2:nodrop:strategy=2
 --lua-desync=multisplit:blob=fake_default_tls:tcp_ts=-500:pos=2:nodrop:strategy=3 --lua-desync=fakeddisorder:pos=midsld:tcp_ts=-500:strategy=3
