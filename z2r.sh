@@ -407,6 +407,10 @@ fallback_mode_text() {
 rst_guard_mode_text() {
   local cfg="/opt/zapret2/config"
   if [ -f "$cfg" ]; then
+    if ! sed -n '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/p' "$cfg" | grep -q '#Z2R_RST_GUARD_BEGIN'; then
+      echo "нет профиля"
+      return
+    fi
     if sed -n '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/p' "$cfg" | grep -q '^[[:space:]]*--skip[[:space:]]'; then
       echo "выключен"
       return
@@ -416,7 +420,7 @@ rst_guard_mode_text() {
       return
     fi
   fi
-  echo "неизвестно"
+  echo "нет config"
 }
 
 voice_mode_text() {
@@ -1673,8 +1677,7 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "18")
-    toggle_rst_guard_mode
-    if pidof nfqws2 >/dev/null; then
+    if toggle_rst_guard_mode && pidof nfqws2 >/dev/null; then
       "$ZAPRET2_INIT" restart
       echo -e "${green}zapret2 перезапущен для применения RST-защиты${plain}"
     fi

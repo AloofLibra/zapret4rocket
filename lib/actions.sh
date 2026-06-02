@@ -346,25 +346,30 @@ toggle_fallback_mode() {
 }
 
 toggle_rst_guard_mode() {
-  local cfg
-  local state_cfg="/opt/zapret2/config"
+  local cfg="/opt/zapret2/config"
   local enable=1
 
   if type rst_guard_lua_update_from_repo >/dev/null 2>&1 && [ ! -s /opt/zapret2/lua/rst-guard.lua ]; then
     rst_guard_lua_update_from_repo || true
   fi
 
-  [ -f "$state_cfg" ] || state_cfg="/opt/zapret2/config.default"
-  if [ -f "$state_cfg" ] && ! sed -n '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/p' "$state_cfg" | grep -q '^[[:space:]]*--skip[[:space:]]'; then
+  if [ ! -f "$cfg" ]; then
+    echo -e "${red}Не найден $cfg.${plain}"
+    return 1
+  fi
+
+  if ! sed -n '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/p' "$cfg" | grep -q '#Z2R_RST_GUARD_BEGIN'; then
+    echo -e "${yellow}В /opt/zapret2/config нет профиля RST-защиты. Обновите конфиг или добавьте блок #Z2R_RST_GUARD_BEGIN вручную.${plain}"
+    return 1
+  fi
+
+  if ! sed -n '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/p' "$cfg" | grep -q '^[[:space:]]*--skip[[:space:]]'; then
     enable=0
   fi
 
-  for cfg in /opt/zapret2/config /opt/zapret2/config.default; do
-    [ -f "$cfg" ] || continue
-    if [ "$enable" -eq 1 ]; then
-      sed -i '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/ s/^[[:space:]]*--skip[[:space:]]\+//' "$cfg"
-    else
-      sed -i '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/ s/^[[:space:]]*--qnum 300 --filter-tcp=/--skip --qnum 300 --filter-tcp=/' "$cfg"
-    fi
-  done
+  if [ "$enable" -eq 1 ]; then
+    sed -i '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/ s/^[[:space:]]*--skip[[:space:]]\+//' "$cfg"
+  else
+    sed -i '/#Z2R_RST_GUARD_BEGIN/,/#Z2R_RST_GUARD_END/ s/^[[:space:]]*--qnum 300 --filter-tcp=/--skip --qnum 300 --filter-tcp=/' "$cfg"
+  fi
 }
