@@ -396,7 +396,7 @@ fallback_mode_text() {
       echo "выключен"
       return
     fi
-    if sed -n '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/p' "$cfg" | grep -q '^[[:space:]]*--filter-tcp=443 --filter-l7=tls'; then
+    if sed -n '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/p' "$cfg" | grep -q '^[[:space:]]*--filter-tcp=443\([[:space:]].*\)\?$'; then
       echo "включен"
       return
     fi
