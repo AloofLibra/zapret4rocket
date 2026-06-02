@@ -509,7 +509,7 @@ blockcheck2_run_summary() {
   local test_name="z4r"
   local default_target="static.rutracker.cc/templates/v1/min/4e695e8ea9cf5a1dcc7aed231b887c51.lib.min.js"
   local test_target="${Z2R_BLOCKCHECK2_DOMAINS:-$default_target}"
-  local log_dir="/opt/zapret2/extra_strats/cache/blockcheck2"
+  local log_dir="/tmp/zapret2/cache/blockcheck2"
   local provider_file="/opt/zapret2/extra_strats/cache/provider.txt"
   local provider_label="" provider_sanitized="" ts=""
   local log_file="" summary_file="" summary_public=""
