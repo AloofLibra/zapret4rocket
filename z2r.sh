@@ -1133,14 +1133,15 @@ webui_ensure_server_binary() {
     return 0
   fi
 
-  if command -v opkg >/dev/null 2>&1; then
+  if command -v apk >/dev/null 2>&1; then
+    apk update 2>/dev/null || true
+    apk add uhttpd busybox 2>/dev/null || apk add busybox 2>/dev/null || true
+  elif command -v opkg >/dev/null 2>&1; then
     PATH="$WEBUI_PATH" opkg install uhttpd 2>/dev/null || true
     [ "$(webui_server_type)" != "none" ] || PATH="$WEBUI_PATH" opkg install uhttpd_kn 2>/dev/null || true
     [ "$(webui_server_type)" != "none" ] || PATH="$WEBUI_PATH" opkg install uhttpd-kn 2>/dev/null || true
     [ "$(webui_server_type)" != "none" ] || PATH="$WEBUI_PATH" opkg install busybox-httpd 2>/dev/null || true
     [ "$(webui_server_type)" != "none" ] || PATH="$WEBUI_PATH" opkg install busybox 2>/dev/null || true
-  elif command -v apk >/dev/null 2>&1; then
-    apk add uhttpd busybox 2>/dev/null || apk add busybox 2>/dev/null || true
   elif command -v apt-get >/dev/null 2>&1; then
     apt-get update 2>/dev/null || true
     apt-get install -y busybox-static 2>/dev/null || apt-get install -y busybox 2>/dev/null || true
@@ -1159,11 +1160,16 @@ webui_ensure_runtime_deps() {
   if PATH="$WEBUI_PATH" command -v nohup >/dev/null 2>&1; then
     return 0
   fi
+  if PATH="$WEBUI_PATH" command -v busybox >/dev/null 2>&1 && PATH="$WEBUI_PATH" busybox --list 2>/dev/null | grep -qx 'nohup'; then
+    return 0
+  fi
 
-  if command -v opkg >/dev/null 2>&1; then
+  if command -v apk >/dev/null 2>&1; then
+    apk update 2>/dev/null || true
+    apk add coreutils-nohup 2>/dev/null || apk add coreutils 2>/dev/null || true
+  elif command -v opkg >/dev/null 2>&1; then
+    PATH="$WEBUI_PATH" opkg update 2>/dev/null || true
     PATH="$WEBUI_PATH" opkg install coreutils-nohup 2>/dev/null || true
-  elif command -v apk >/dev/null 2>&1; then
-    apk add coreutils 2>/dev/null || true
   elif command -v apt-get >/dev/null 2>&1; then
     apt-get update 2>/dev/null || true
     apt-get install -y coreutils 2>/dev/null || true
@@ -1172,8 +1178,12 @@ webui_ensure_runtime_deps() {
   fi
 
   if ! PATH="$WEBUI_PATH" command -v nohup >/dev/null 2>&1; then
+    if PATH="$WEBUI_PATH" command -v busybox >/dev/null 2>&1 && PATH="$WEBUI_PATH" busybox --list 2>/dev/null | grep -qx 'nohup'; then
+      return 0
+    fi
     echo -e "${red}Не удалось найти или установить nohup для web UI.${plain}"
     [ "$OSystem" = "entware" ] && echo -e "${yellow}Для Keenetic/Entware нужен пакет coreutils-nohup.${plain}"
+    [ "$OSystem" = "WRT" ] && echo -e "${yellow}Для OpenWrt нужен пакет coreutils-nohup или BusyBox с applet nohup.${plain}"
     return 1
   fi
 

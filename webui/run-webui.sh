@@ -128,13 +128,25 @@ run_server() {
   exit 1
 }
 
+start_detached() {
+  if command -v nohup >/dev/null 2>&1; then
+    nohup bash "$0" run >>"$LOG_FILE" 2>&1 &
+    return
+  fi
+  if command -v busybox >/dev/null 2>&1 && busybox --list 2>/dev/null | grep -qx 'nohup'; then
+    busybox nohup bash "$0" run >>"$LOG_FILE" 2>&1 &
+    return
+  fi
+  bash "$0" run >>"$LOG_FILE" 2>&1 &
+}
+
 start_server() {
   ensure_dirs
   if is_running_any; then
     echo "already running"
     return 0
   fi
-  nohup bash "$0" run >>"$LOG_FILE" 2>&1 &
+  start_detached
   echo $! > "$PID_FILE"
   sleep 1
   if ! is_running; then
