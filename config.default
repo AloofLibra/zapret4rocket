@@ -391,7 +391,7 @@ NFQWS2_OPT="
 --lua-desync=fake:blob=fake_default_http:tcp_ts=-1000:repeats=2:strategy=5 --lua-desync=multidisorder:pos=method+2,host+1,midsld:strategy=5
 --lua-desync=multisplit:pos=method+2,host+1,midsld:seqovl=8:seqovl_pattern=0x474554202f204854:strategy=6
 --lua-desync=http_hostcase:spell=hoSt:strategy=7 --lua-desync=http_domcase:strategy=7 --lua-desync=http_methodeol:strategy=7
---lua-desync=fake:blob=stun:tcp_ts=-1000:repeats=2:strategy=8 --lua-desync=multisplit:pos=sld+1:seqovl=1:strategy=8
+--lua-desync=fake:blob=stun_fake:tcp_ts=-1000:repeats=2:strategy=8 --lua-desync=multisplit:pos=sld+1:seqovl=1:strategy=8
   #Z2R_FALLBACK_HTTP_END
   
 "
