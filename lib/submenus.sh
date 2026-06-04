@@ -14,7 +14,7 @@ strategies_submenu() {
     p5_max="$(orch_max_strategy_for_profile 5)"
     p6_max="$(orch_max_strategy_for_profile 6)"
     p9_max="$(orch_max_strategy_for_profile 9)"
-    clear
+    clear -x
 
     echo -e "${cyan}--- Управление стратегиями ---${plain}"
     echo -e "${yellow}Выбор стратегии профиля (0 или Enter для выхода)${plain}"
@@ -78,7 +78,7 @@ strategies_submenu() {
 
 flowoffload_submenu() {
   while true; do
-    clear
+    clear -x
     echo -e "${cyan}--- FLOWOFFLOAD ---${plain}"
     echo "Текущее состояние: $(config_get_var /opt/zapret2/config FLOWOFFLOAD 2>/dev/null)"
     echo ""
@@ -137,7 +137,7 @@ tcp443_submenu() {
   cfg="/opt/zapret2/config"
 
   while true; do
-  clear
+  clear -x
   selected_count="$(config_tcp443_current_strategy "$cfg")"
   echo -e "${yellow}Безразборный режим по стратегии: ${plain}$selected_count"
   echo -e "\033[33mС каким номером применить стратегию? (1-19, 0 - отключение безразборного режима, Enter - выход) \033[31mПри активации кастомно подобранные домены будут очищены:${plain}"
@@ -184,7 +184,7 @@ provider_submenu() {
   provider_init_once
 
   while true; do
-    clear
+    clear -x
     echo -e "${cyan}--- Провайдер / подсказки ---${plain}"
     echo -e "Текущий провайдер: ${green}${PROVIDER_MENU}${plain}"
     echo ""
@@ -232,7 +232,7 @@ provider_submenu() {
 }
 
 beginner_guide_menu() {
-  clear
+  clear -x
   echo -e "${Bblue}${Fplain} Не знаешь, с чего начать? Есть проблемы? ${plain}"
   echo ""
   echo -e "${Fcyan}Что делает проект${plain}"
