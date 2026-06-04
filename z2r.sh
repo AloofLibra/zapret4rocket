@@ -1320,7 +1320,7 @@ webui_remove() {
 
 webui_submenu() {
   while true; do
-    clear
+    clear -x
     echo -e "${cyan}--- Web UI ---${plain}"
     echo -e "${yellow}Состояние: ${plain}$(webui_status_text)"
     echo ""
@@ -1369,7 +1369,7 @@ get_menu() {
     if [[ -s "$PREMIUM_TITLE_FILE" ]]; then
       TITLE_MENU_LINE="\n${pink}Титул:${plain} $(cat "$PREMIUM_TITLE_FILE")${yellow}\n"
     fi
-    clear
+    clear -x
     echo -e "${cyan}========================================${plain}"
     echo -e "${Fcyan}            zeefeer4rocket             ${plain}"
     echo -e "${Fgreen}         z2r - zapret2 Manager          ${plain}"
