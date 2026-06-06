@@ -138,9 +138,9 @@ config_profile_max_strategy() {
         index($0, begin) {inblk=1; next}
         index($0, end) {inblk=0; exit}
         inblk {
-            if ($0 ~ /^--import=/) {
+            if ($0 ~ /^--import([=[:space:]]|$)/) {
                 imp=$0
-                sub(/^--import=/, "", imp)
+                sub(/^--import[=[:space:]]+/, "", imp)
                 sub(/[[:space:]].*$/, "", imp)
                 if (tplmax[imp]>max) max=tplmax[imp]
             }
@@ -180,9 +180,9 @@ config_profile_max_strategy() {
           } else {
               start_profile_if_needed()
           }
-          if (!in_template && active && prof==pid && $0 ~ /^--import=/) {
+          if (!in_template && active && prof==pid && $0 ~ /^--import([=[:space:]]|$)/) {
               imp=$0
-              sub(/^--import=/, "", imp)
+              sub(/^--import[=[:space:]]+/, "", imp)
               sub(/[[:space:]].*$/, "", imp)
               if (tplmax[imp]>max) max=tplmax[imp]
           }

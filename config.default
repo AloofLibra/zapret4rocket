@@ -138,7 +138,7 @@ NFQWS2_OPT="
 --in-range=-s32768 --lua-desync=circular_locked:key=1
 --in-range=x
 --payload=tls_client_hello
---import=z2r_tcp_tls_common
+--import z2r_tcp_tls_common
 
 --new
 
@@ -151,7 +151,7 @@ NFQWS2_OPT="
 --in-range=-s32768 --lua-desync=circular_locked:key=2
 --in-range=x 
 --payload=tls_client_hello
---import=z2r_tcp_tls_common
+--import z2r_tcp_tls_common
 
 --new
 #Z2R_TCP443_END
@@ -167,7 +167,7 @@ NFQWS2_OPT="
 --in-range=-s32768 --lua-desync=circular_locked:key=3
 --in-range=x
 --payload=tls_client_hello,http_req
---import=z2r_tcp_tls_common
+--import z2r_tcp_tls_common
 
 --new
 
@@ -290,7 +290,7 @@ NFQWS2_OPT="
 --in-range=-s32768 --lua-desync=circular_locked:key=8:allow_nohost=1
 --in-range=x
 --payload=tls_client_hello
---import=z2r_tcp_tls_common
+--import z2r_tcp_tls_common
   #Z2R_FALLBACK_END
 
 --new
