@@ -94,8 +94,11 @@ NFQWS2_OPT="
 --blob=discord_fake:/opt/zapret2/files/fake/quic_initial_dbankcloud_ru.bin
 --blob=stun_fake:@/opt/zapret2/files/fake/stun.bin
 
-# Общий шаблон TCP TLS стратегий. Рабочие профили импортируют его через --import.
+# Общий TCP TLS шаблон на базе блока YT. Содержит range/payload для lua-desync.
 --template=z2r_tcp_tls_common
+--out-range=-s34228
+--in-range=x
+--payload=tls_client_hello
 --lua-desync=fake:blob=fake_default_tls:tcp_ts=-1000:repeats=2:strategy=1 --lua-desync=multisplit:pos=1,midsld:strategy=1
 --lua-desync=multisplit:blob=fake_default_tls:tcp_ts=-500:pos=2:nodrop:strategy=2
 --lua-desync=multisplit:blob=fake_default_tls:tcp_ts=-500:pos=2:nodrop:strategy=3 --lua-desync=fakeddisorder:pos=midsld:tcp_ts=-500:strategy=3
@@ -136,9 +139,7 @@ NFQWS2_OPT="
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello
 --out-range=-s34228
 --in-range=-s32768 --lua-desync=circular_locked:key=1
---in-range=x
---payload=tls_client_hello
---import z2r_tcp_tls_common
+--import=z2r_tcp_tls_common
 
 --new
 
@@ -147,13 +148,12 @@ NFQWS2_OPT="
 --hostlist-domains=googlevideo.com
 --hostlist-exclude=/opt/zapret2/lists/netrogat.txt
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello 
---out-range=-s342 
+--out-range=-s34228
 --in-range=-s32768 --lua-desync=circular_locked:key=2
---in-range=x 
---payload=tls_client_hello
---import z2r_tcp_tls_common
+--import=z2r_tcp_tls_common
 
 --new
+
 #Z2R_TCP443_END
 
   #Стратегии для RKN
@@ -165,9 +165,7 @@ NFQWS2_OPT="
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello
 --out-range=-s34228
 --in-range=-s32768 --lua-desync=circular_locked:key=3
---in-range=x
---payload=tls_client_hello,http_req
---import z2r_tcp_tls_common
+--import=z2r_tcp_tls_common
 
 --new
 
@@ -175,7 +173,7 @@ NFQWS2_OPT="
 --filter-tcp=80,443,2053,2083,2087,2096,8443 --hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt
 --hostlist-exclude=/opt/zapret2/lists/netrogat.txt
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello 
---out-range=-s34228 
+--out-range=-s34228
 --in-range=-s32768 --lua-desync=circular_locked:key=4
 --in-range=x 
 --payload=tls_client_hello,discord_ip_discovery 
@@ -286,11 +284,9 @@ NFQWS2_OPT="
 --skip --filter-tcp=443 --filter-l7=tls
 --hostlist-exclude=/opt/zapret2/lists/netrogat.txt
 --payload=tls_client_hello,http_req,http_reply,unknown,tls_server_hello
---out-range=-s3422
+--out-range=-s34228
 --in-range=-s32768 --lua-desync=circular_locked:key=8:allow_nohost=1
---in-range=x
---payload=tls_client_hello
---import z2r_tcp_tls_common
+--import=z2r_tcp_tls_common
   #Z2R_FALLBACK_END
 
 --new
