@@ -69,17 +69,13 @@ config_tls_blob_mode_text() {
   cfg="$(config_get_file "$1")" || { echo "не определён"; return 0; }
 
   if awk '
-      /--filter-l7=tls/ || index($0, "--hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt") {in_tls=1}
-      in_tls && /^[[:space:]]*--new[[:space:]]*$/ {in_tls=0}
-      in_tls && /--lua-desync=/ && /blob=maxru/ && $0 !~ /strategy=26/ {found=1}
+      /--lua-desync=/ && /blob=maxru/ && $0 !~ /strategy=26/ {found=1}
       END {exit(found?0:1)}
     ' "$cfg"; then
     has_tls_maxru=1
   fi
   if awk '
-      /--filter-l7=tls/ || index($0, "--hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt") {in_tls=1}
-      in_tls && /^[[:space:]]*--new[[:space:]]*$/ {in_tls=0}
-      in_tls && /--lua-desync=/ && /blob=fake_default_tls/ && $0 !~ /strategy=26/ {found=1}
+      /--lua-desync=/ && /blob=fake_default_tls/ && $0 !~ /strategy=26/ {found=1}
       END {exit(found?0:1)}
     ' "$cfg"; then
     has_tls_default=1
@@ -123,17 +119,33 @@ config_profile_max_strategy() {
       end_marker="#Z2R_FALLBACK_END"
     fi
     fallback_max="$(awk -v begin="$begin_marker" -v end="$end_marker" '
-        BEGIN{inblk=0; max=0}
-        index($0, begin) {inblk=1; next}
-        index($0, end) {inblk=0; exit}
-        inblk {
-            line=$0
+        function scan_strategies(line) {
             while (match(line, /strategy=[0-9]+/)) {
                 num=substr(line, RSTART+9, RLENGTH-9)+0
-                if (num>max) max=num
+                if (in_template && num>tplmax[tpl]) tplmax[tpl]=num
+                if (inblk && num>max) max=num
                 line=substr(line, RSTART+RLENGTH)
             }
         }
+        BEGIN{inblk=0; in_template=0; tpl=""; max=0}
+        /^--template=/ {
+            in_template=1
+            tpl=$0
+            sub(/^--template=/, "", tpl)
+            sub(/[[:space:]].*$/, "", tpl)
+        }
+        /^[[:space:]]*--new[[:space:]]*$/ {in_template=0; tpl=""}
+        index($0, begin) {inblk=1; next}
+        index($0, end) {inblk=0; exit}
+        inblk {
+            if ($0 ~ /^--import=/) {
+                imp=$0
+                sub(/^--import=/, "", imp)
+                sub(/[[:space:]].*$/, "", imp)
+                if (tplmax[imp]>max) max=tplmax[imp]
+            }
+        }
+        { scan_strategies($0) }
         END{print max}
     ' "$cfg")"
     if [ -n "$fallback_max" ] && [ "$fallback_max" -gt 0 ]; then
@@ -143,18 +155,39 @@ config_profile_max_strategy() {
   fi
 
   awk -v pid="$profile" '
-      BEGIN{inopt=0; prof=1; max=0}
+      function scan_strategies(line) {
+          while (match(line, /strategy=[0-9]+/)) {
+              num=substr(line, RSTART+9, RLENGTH-9)+0
+              if (in_template && num>tplmax[tpl]) tplmax[tpl]=num
+              if (!in_template && active && prof==pid && num>max) max=num
+              line=substr(line, RSTART+RLENGTH)
+          }
+      }
+      function start_profile_if_needed() {
+          if (!in_template && !active && $0 ~ /^--/ && $0 !~ /^--new/ && $0 !~ /^--lua-init/ && $0 !~ /^--blob=/) {
+              prof++
+              active=1
+          }
+      }
+      BEGIN{inopt=0; prof=0; active=0; in_template=0; tpl=""; max=0}
       /^NFQWS2_OPT="/ {inopt=1}
       inopt {
-          if ($0 ~ /^--new/) prof++
-          if (prof==pid) {
-              line=$0
-              while (match(line, /strategy=[0-9]+/)) {
-                  num=substr(line, RSTART+9, RLENGTH-9)+0
-                  if (num>max) max=num
-                  line=substr(line, RSTART+RLENGTH)
-              }
+          if ($0 ~ /^--template=/) {
+              in_template=1
+              tpl=$0
+              sub(/^--template=/, "", tpl)
+              sub(/[[:space:]].*$/, "", tpl)
+          } else {
+              start_profile_if_needed()
           }
+          if (!in_template && active && prof==pid && $0 ~ /^--import=/) {
+              imp=$0
+              sub(/^--import=/, "", imp)
+              sub(/[[:space:]].*$/, "", imp)
+              if (tplmax[imp]>max) max=tplmax[imp]
+          }
+          scan_strategies($0)
+          if ($0 ~ /^--new/) {active=0; in_template=0; tpl=""}
           if ($0 ~ /^"$/) exit
       }
       END{print max}

@@ -226,17 +226,13 @@ menu_action_set_tls_blob() {
   current_blob="$(sed -n -E 's#.*--blob=maxru:@/opt/zapret2/files/fake/([^[:space:]]+).*#\1#p' "$cfg" | head -n1)"
   [ -z "$current_blob" ] && current_blob="не найден в конфиге"
   if awk '
-      /--filter-l7=tls/ || index($0, "--hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt") {in_tls=1}
-      in_tls && /^[[:space:]]*--new[[:space:]]*$/ {in_tls=0}
-      in_tls && /--lua-desync=/ && /blob=maxru/ && $0 !~ /strategy=26/ {found=1}
+      /--lua-desync=/ && /blob=maxru/ && $0 !~ /strategy=26/ {found=1}
       END {exit(found?0:1)}
     ' "$cfg"; then
     has_tls_maxru=1
   fi
   if awk '
-      /--filter-l7=tls/ || index($0, "--hostlist=/opt/zapret2/extra_strats/TCP_Discord.txt") {in_tls=1}
-      in_tls && /^[[:space:]]*--new[[:space:]]*$/ {in_tls=0}
-      in_tls && /--lua-desync=/ && /blob=fake_default_tls/ && $0 !~ /strategy=26/ {found=1}
+      /--lua-desync=/ && /blob=fake_default_tls/ && $0 !~ /strategy=26/ {found=1}
       END {exit(found?0:1)}
     ' "$cfg"; then
     has_tls_default=1
@@ -282,11 +278,9 @@ menu_action_set_tls_blob() {
 
   if [ "$choice" -eq 1 ]; then
     if [ "$sed_ereg" = "-E" ]; then
-      sed -i -E '/--filter-l7=tls/,/^[[:space:]]*--new[[:space:]]*$/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)maxru#\1fake_default_tls#g; }' "$cfg"
-      sed -i -E '/--hostlist=\/opt\/zapret2\/extra_strats\/TCP_Discord\.txt/,/^[[:space:]]*--new[[:space:]]*$/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)maxru#\1fake_default_tls#g; }' "$cfg"
+      sed -i -E '/--lua-desync=/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)maxru#\1fake_default_tls#g; }' "$cfg"
     else
-      sed -i -r '/--filter-l7=tls/,/^[[:space:]]*--new[[:space:]]*$/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)maxru#\1fake_default_tls#g; }' "$cfg"
-      sed -i -r '/--hostlist=\/opt\/zapret2\/extra_strats\/TCP_Discord\.txt/,/^[[:space:]]*--new[[:space:]]*$/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)maxru#\1fake_default_tls#g; }' "$cfg"
+      sed -i -r '/--lua-desync=/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)maxru#\1fake_default_tls#g; }' "$cfg"
     fi
     echo -e "${green}В TLS-стратегиях выбран встроенный blob: fake_default_tls${plain}"
     echo -e "${yellow}Строка --blob=maxru:@... сохранена без изменений для обратного переключения.${plain}"
@@ -303,12 +297,10 @@ menu_action_set_tls_blob() {
   fi
 
   if [ "$sed_ereg" = "-E" ]; then
-    sed -i -E '/--filter-l7=tls/,/^[[:space:]]*--new[[:space:]]*$/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)fake_default_tls#\1maxru#g; }' "$cfg"
-    sed -i -E '/--hostlist=\/opt\/zapret2\/extra_strats\/TCP_Discord\.txt/,/^[[:space:]]*--new[[:space:]]*$/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)fake_default_tls#\1maxru#g; }' "$cfg"
+    sed -i -E '/--lua-desync=/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)fake_default_tls#\1maxru#g; }' "$cfg"
     sed -i -E "s#(${prefix})[^[:space:]]+#\\1${selected_blob}#g" "$cfg"
   else
-    sed -i -r '/--filter-l7=tls/,/^[[:space:]]*--new[[:space:]]*$/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)fake_default_tls#\1maxru#g; }' "$cfg"
-    sed -i -r '/--hostlist=\/opt\/zapret2\/extra_strats\/TCP_Discord\.txt/,/^[[:space:]]*--new[[:space:]]*$/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)fake_default_tls#\1maxru#g; }' "$cfg"
+    sed -i -r '/--lua-desync=/ { /strategy=26/! s#(--lua-desync=[^[:space:]]*blob=)fake_default_tls#\1maxru#g; }' "$cfg"
     sed -i -r "s#(${prefix})[^[:space:]]+#\\1${selected_blob}#g" "$cfg"
   fi
   echo -e "${green}Обновлено: --blob=maxru -> ${selected_blob}${plain}"
