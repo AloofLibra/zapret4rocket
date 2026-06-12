@@ -385,62 +385,6 @@ if [ -f /opt/zapret2/config ]; then
   fi
 fi
 
-hostlist_mode_text() {
-  config_hostlist_mode_text "$@"
-}
-
-fallback_mode_text() {
-  local cfg="/opt/zapret2/config"
-  if [ -f "$cfg" ]; then
-    if { sed -n '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/p' "$cfg"; sed -n '/#Z2R_FALLBACK_HTTP_BEGIN/,/#Z2R_FALLBACK_HTTP_END/p' "$cfg"; } | grep -q '^[[:space:]]*--skip[[:space:]]'; then
-      echo "выключен"
-      return
-    fi
-    if sed -n '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/p' "$cfg" | grep -q '^[[:space:]]*--filter-tcp=443\([[:space:]].*\)\?$'; then
-      echo "включен"
-      return
-    fi
-  fi
-  echo "неизвестно"
-}
-
-rst_guard_mode_text() {
-  local cfg="/opt/zapret2/config"
-  if [ -f "$cfg" ]; then
-    if grep -q -- '--lua-desync=rst_guard_locked:key=' "$cfg"; then
-      echo "включен"
-      return
-    fi
-    echo "выключен"
-    return
-  fi
-  echo "нет config"
-}
-
-voice_mode_text() {
-  local cfg
-  local ports
-  local voice_block_active=0
-  cfg="$(get_config_file)"
-  if [ -n "$cfg" ]; then
-    ports="$(config_get_var "$cfg" NFQWS2_PORTS_UDP)"
-    if sed -n '/#Стратегии для голосовой связи/,/^[[:space:]]*--new[[:space:]]*$/p' "$cfg" | grep -q '^[[:space:]]*--filter-udp='; then
-      voice_block_active=1
-    fi
-    if printf "%s" "$ports" | grep -Eq '(^|,)50000-50099(,|$)' && [ "$voice_block_active" -eq 1 ]; then
-      echo "Кастомные стратегии"
-      return
-    fi
-    if ! printf "%s" "$ports" | grep -Eq '(^|,)50000-50099(,|$)' && [ "$voice_block_active" -eq 0 ]; then
-      echo "Скрипты bol-van"
-      return
-    fi
-    echo "неизвестно"
-    return
-  fi
-  echo "неизвестно"
-}
-
 fallback_strategy_text() {
   local file="/opt/zapret2/extra_strats/cache/orchestra/locked.manual.tsv"
   if [ -f "$file" ]; then
@@ -504,11 +448,6 @@ fallback_http_profile_try() {
   orch_profile_try "9" "Профиль 9: fallback HTTP (безразборный блок)" "http" "http://deb.torproject.org/torproject.org"
   ORCH_LOCK_FILE="$prev_lock_file"
 }
-
-tls_blob_menu_text() {
-  config_tls_blob_text "$@"
-}
-
 
 change_user() {
    if /opt/zapret2/nfq2/nfqws2 --dry-run --user="nobody" 2>&1 | grep -q "queue"; then
@@ -1503,16 +1442,16 @@ Enter (без цифр) - переустановка/обновление zapret
 '"${Fcyan}"'5.'"${yellow}"' Обновить стратегии, сбросить листы подбора стратегий и исключений (есть бэкап)
 '"${Fcyan}"'6.'"${yellow}"' Добавить домен в исключения
 '"${Fcyan}"'7.'"${yellow}"' Открыть в редакторе config (Установит nano редактор ~250kb)
-'"${Fcyan}"'8.'"${yellow}"' Переключатель между дефолтными сриптами от bol-van и кастомными стратегиями для голосовой связи. Сейчас: '"${plain}"'['"$(voice_mode_text)"']'"${yellow}"'
-'"${Fcyan}"'9.'"${yellow}"' Переключатель zapret2 на nftables/iptables (На всё жать Enter). Актуально для OpenWRT 21+. Может помочь с войсами. Сейчас: '"${plain}"'['"$(grep -q '^FWTYPE=iptables$' /opt/zapret2/config && echo "iptables" || (grep -q '^FWTYPE=nftables$' /opt/zapret2/config && echo "nftables" || echo "Неизвестно"))"']'"${yellow}"'
-'"${Fcyan}"'10.'"${yellow}"' (Де)активировать обход UDP на 1026-65531 портах (BF6, Fifa и т.п.). Сейчас: '"${plain}"'['"$(grep -q '^NFQWS_PORTS_UDP=443' /opt/zapret2/config && echo "Выключен" || (grep -q '^NFQWS_PORTS_UDP=1026-65531,443' /opt/zapret2/config && echo "Включен" || echo "Неизвестно"))"']'"${yellow}"'
-'"${Fcyan}"'11.'"${yellow}"' Управление аппаратным ускорением zapret2. Может увеличить скорость на роутере. Сейчас: '"${plain}"'['"$(grep '^FLOWOFFLOAD=' /opt/zapret2/config)"']'"${yellow}"'
-'"${Fcyan}"'12.'"${yellow}"' Режим фильтра hostlist/autohostlist. Сейчас: '"${plain}"'['"$(hostlist_mode_text)"']'"${yellow}"'
-'"${Fcyan}"'13.'"${yellow}"' Безразборный режим (fallback). Сейчас: '"${plain}"'['"$(fallback_mode_text)"']'"${yellow}"'
+'"${Fcyan}"'8.'"${yellow}"' Переключатель между дефолтными сриптами от bol-van и кастомными стратегиями для голосовой связи. Сейчас: '"${plain}"'['"$(config_mode_text voice)"']'"${yellow}"'
+'"${Fcyan}"'9.'"${yellow}"' Переключатель zapret2 на nftables/iptables (На всё жать Enter). Актуально для OpenWRT 21+. Может помочь с войсами. Сейчас: '"${plain}"'['"$(config_mode_text fwtype)"']'"${yellow}"'
+'"${Fcyan}"'10.'"${yellow}"' (Де)активировать обход UDP на 1026-65531 портах (BF6, Fifa и т.п.). Сейчас: '"${plain}"'['"$(config_mode_text udp_games)"']'"${yellow}"'
+'"${Fcyan}"'11.'"${yellow}"' Управление аппаратным ускорением zapret2. Может увеличить скорость на роутере. Сейчас: '"${plain}"'['"$(config_mode_text flowoffload)"']'"${yellow}"'
+'"${Fcyan}"'12.'"${yellow}"' Режим фильтра hostlist/autohostlist. Сейчас: '"${plain}"'['"$(config_mode_text hostlist)"']'"${yellow}"'
+'"${Fcyan}"'13.'"${yellow}"' Безразборный режим (fallback). Сейчас: '"${plain}"'['"$(config_mode_text fallback)"']'"${yellow}"'
 '"${Fcyan}"'14.'"${yellow}"' Активировать доступ в меню через браузер (~3мб места)
 '"${Fcyan}"'15.'"${yellow}"' Провайдер
-'"${Fcyan}"'16.'"${yellow}"' Сменить TLS blob (--blob=maxru). Сейчас: '"${plain}"'['"$(tls_blob_menu_text)"']'"${yellow}"'
-'"${Fcyan}"'18.'"${yellow}"' Защита от RST-инъекций. (BETA) Сейчас: '"${plain}"'['"$(rst_guard_mode_text)"']'"${yellow}"'
+'"${Fcyan}"'16.'"${yellow}"' Сменить TLS blob (--blob=maxru). Сейчас: '"${plain}"'['"$(config_mode_text tls_blob_menu)"']'"${yellow}"'
+'"${Fcyan}"'18.'"${yellow}"' Защита от RST-инъекций. (BETA) Сейчас: '"${plain}"'['"$(config_mode_text rst_guard)"']'"${yellow}"'
 '"${Fcyan}"'777.'"${yellow}"' Активировать zeefeer premium (Нажимать только Valery ProD, avg97, Xoz, GeGunT, blagodarenya, mikhyan, Xoz, andric62, Whoze, Necronicle, Andrei_5288515371, Nomand, Dina_turat, Nergalss, Александру, АлександруП, vecheromholodno, ЕвгениюГ, Dyadyabo, skuwakin, izzzgoy, Grigaraz, Reconnaissance, comandante1928, umad, rudnev2028, rutakote, railwayfx, vtokarev1604, Grigaraz, a40letbezurojaya и subzeero452 и остальным поддержавшим проект. Но если очень хочется - можно нажать и другим)\033[0m'
     echo -e "${Bred}${Fplain}17. Не знаешь, с чего начать? Есть проблемы? Жми сюда!${plain}"
 	if [[ -f "$PREMIUM_FLAG" ]]; then
@@ -1675,7 +1614,7 @@ Enter (без цифр) - переустановка/обновление zapret
       "$ZAPRET2_INIT" restart
       echo -e "${green}zapret2 перезапущен для применения RST-защиты${plain}"
     fi
-    echo -e "${green}RST-защита: $(rst_guard_mode_text).${plain}"
+    echo -e "${green}RST-защита: $(config_mode_text rst_guard).${plain}"
     pause_enter
     ;;
 

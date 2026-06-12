@@ -50,19 +50,7 @@ config_set_var() {
   fi
 }
 
-config_hostlist_mode_text() {
-  local cfg
-  cfg="$(config_get_file "$1")" || { echo "неизвестно"; return 0; }
-  if grep -q '^MODE_FILTER=autohostlist' "$cfg"; then
-    echo "авто"
-  elif grep -q '^MODE_FILTER=hostlist' "$cfg"; then
-    echo "по листам"
-  else
-    echo "неизвестно"
-  fi
-}
-
-config_tls_blob_mode_text() {
+config_tls_blob_mode_value() {
   local cfg
   local has_tls_maxru=0
   local has_tls_default=0
@@ -92,16 +80,97 @@ config_tls_blob_mode_text() {
   fi
 }
 
-config_tls_blob_text() {
+config_tls_blob_menu_value() {
   local cfg blob_file mode
   cfg="$(config_get_file "$1")" || { echo "неизвестно"; return 0; }
-  mode="$(config_tls_blob_mode_text "$cfg")"
+  mode="$(config_tls_blob_mode_value "$cfg")"
   case "$mode" in
     fake_default_tls) echo "default"; return ;;
     mixed) echo "mixed"; return ;;
   esac
   blob_file="$(sed -n -E 's#.*--blob=maxru:@/opt/zapret2/files/fake/([^[:space:]]+).*#\1#p' "$cfg" | head -n1)"
   [ -n "$blob_file" ] && echo "$blob_file" || echo "неизвестно"
+}
+
+config_mode_text() {
+  local mode="$1"
+  local cfg="$2"
+  local ports voice_block_active
+
+  cfg="$(config_get_file "$cfg")" || {
+    case "$mode" in
+      rst_guard) echo "нет config" ;;
+      tls_blob_mode) echo "не определён" ;;
+      *) echo "неизвестно" ;;
+    esac
+    return 0
+  }
+
+  case "$mode" in
+    flowoffload)
+      config_get_var "$cfg" FLOWOFFLOAD
+      ;;
+    fwtype)
+      config_get_var "$cfg" FWTYPE
+      ;;
+    hostlist)
+      if grep -q '^MODE_FILTER=autohostlist' "$cfg"; then
+        echo "авто"
+      elif grep -q '^MODE_FILTER=hostlist' "$cfg"; then
+        echo "по листам"
+      else
+        echo "неизвестно"
+      fi
+      ;;
+    fallback)
+      if { sed -n '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/p' "$cfg"; sed -n '/#Z2R_FALLBACK_HTTP_BEGIN/,/#Z2R_FALLBACK_HTTP_END/p' "$cfg"; } | grep -q '^[[:space:]]*--skip[[:space:]]'; then
+        echo "выключен"
+      elif sed -n '/#Z2R_FALLBACK_BEGIN/,/#Z2R_FALLBACK_END/p' "$cfg" | grep -q '^[[:space:]]*--filter-tcp=443\([[:space:]].*\)\?$'; then
+        echo "включен"
+      else
+        echo "неизвестно"
+      fi
+      ;;
+    rst_guard)
+      if grep -q -- '--lua-desync=rst_guard_locked:key=' "$cfg"; then
+        echo "включен"
+      else
+        echo "выключен"
+      fi
+      ;;
+    udp_games)
+      if printf "%s" "$(config_get_var "$cfg" NFQWS2_PORTS_UDP)" | grep -Eq '(^|,)1026-65531(,|$)'; then
+        echo "Включен"
+      elif config_var_exists "$cfg" NFQWS2_PORTS_UDP; then
+        echo "Выключен"
+      else
+        echo "Неизвестно"
+      fi
+      ;;
+    voice)
+      ports="$(config_get_var "$cfg" NFQWS2_PORTS_UDP)"
+      voice_block_active=0
+      if sed -n '/#Стратегии для голосовой связи/,/^[[:space:]]*--new[[:space:]]*$/p' "$cfg" | grep -q '^[[:space:]]*--filter-udp='; then
+        voice_block_active=1
+      fi
+      if printf "%s" "$ports" | grep -Eq '(^|,)50000-50099(,|$)' && [ "$voice_block_active" -eq 1 ]; then
+        echo "Кастомные стратегии"
+      elif ! printf "%s" "$ports" | grep -Eq '(^|,)50000-50099(,|$)' && [ "$voice_block_active" -eq 0 ]; then
+        echo "Скрипты bol-van"
+      else
+        echo "неизвестно"
+      fi
+      ;;
+    tls_blob_mode)
+      config_tls_blob_mode_value "$cfg"
+      ;;
+    tls_blob_menu)
+      config_tls_blob_menu_value "$cfg"
+      ;;
+    *)
+      echo "неизвестно"
+      ;;
+  esac
 }
 
 config_profile_max_strategy() {

@@ -152,20 +152,30 @@ menu_action_toggle_fwtype() {
 }
 
 menu_action_toggle_udp_range() {
-  local cfg
+  local cfg current_ports new_ports
   cfg="$(get_config_file)"
-  if [ "$(config_get_var "$cfg" NFQWS_PORTS_UDP)" = "443" ]; then
-    config_set_var "$cfg" NFQWS_PORTS_UDP "1026-65531,443"
-    sed -i 's/^--skip --filter-udp=1026/--filter-udp=1026/' "$cfg"
+  current_ports="$(config_get_var "$cfg" NFQWS2_PORTS_UDP)"
+
+  if ! printf "%s" "$current_ports" | grep -Eq '(^|,)1026-65531(,|$)'; then
+    if [ -n "$current_ports" ]; then
+      new_ports="1026-65531,$current_ports"
+    else
+      new_ports="1026-65531,443"
+    fi
+    config_set_var "$cfg" NFQWS2_PORTS_UDP "$new_ports"
+    sed -i '/#Стратегии для игрового UDP/,/^[[:space:]]*--new[[:space:]]*$/ s/^--skip[[:space:]]\+--filter-udp=1026/--filter-udp=1026/' "$cfg"
     echo -e "${green}Стратегия UDP обхода активирована. Выделены порты 1026-65531${plain}"
 
-  elif [ "$(config_get_var "$cfg" NFQWS_PORTS_UDP)" = "1026-65531,443" ]; then
-    config_set_var "$cfg" NFQWS_PORTS_UDP "443"
-    sed -i 's/^--filter-udp=1026/--skip --filter-udp=1026/' "$cfg"
+  elif printf "%s" "$current_ports" | grep -Eq '(^|,)1026-65531(,|$)'; then
+    new_ports=",$current_ports,"
+    new_ports="$(printf "%s" "$new_ports" | sed 's/,1026-65531,/,/g; s/,,*/,/g; s/^,//; s/,$//')"
+    [ -n "$new_ports" ] || new_ports="443"
+    config_set_var "$cfg" NFQWS2_PORTS_UDP "$new_ports"
+    sed -i '/#Стратегии для игрового UDP/,/^[[:space:]]*--new[[:space:]]*$/ s/^--filter-udp=1026/--skip --filter-udp=1026/' "$cfg"
     echo -e "${green}Стратегия UDP обхода ДЕактивирована. Выделенные порты 1026-65531 убраны${plain}"
 
   else
-    echo -e "${yellow}Неизвестное состояние строки NFQWS_PORTS_UDP. Проверь конфиг вручную.${plain}"
+    echo -e "${yellow}Неизвестное состояние строки NFQWS2_PORTS_UDP. Проверь конфиг вручную.${plain}"
     return 0
   fi
 

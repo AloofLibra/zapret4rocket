@@ -82,22 +82,6 @@ set_zapret2_init() {
   fi
 }
 
-hostlist_mode_text() {
-  config_hostlist_mode_text "$CONFIG_FILE"
-}
-
-flowoffload_text() {
-  config_get_var "$CONFIG_FILE" FLOWOFFLOAD
-}
-
-fwtype_text() {
-  config_get_var "$CONFIG_FILE" FWTYPE
-}
-
-tls_blob_menu_text() {
-  config_tls_blob_text "$CONFIG_FILE"
-}
-
 orch_max_strategy_for_profile() {
   config_profile_max_strategy "$1" "$CONFIG_FILE"
 }
@@ -106,7 +90,7 @@ profile_proto_list() {
   case "$1" in
     1) echo "tls http" ;;
     2|3|4) echo "tls" ;;
-    5|6) echo "udp" ;;
+    5|6|7) echo "udp" ;;
     *) echo "" ;;
   esac
 }
@@ -222,7 +206,7 @@ api_status() {
   local running
   if zapret2_running; then running=true; else running=false; fi
   send_json "200 OK" "$(cat <<EOF
-{"zapret2_running":$running,"strategy_locks_status":"$(json_escape "$(strategy_locks_status_text)")","hostlist_mode":"$(json_escape "$(hostlist_mode_text)")","fwtype":"$(json_escape "$(fwtype_text)")","flowoffload":"$(json_escape "$(flowoffload_text)")","tls_blob_mode":"$(json_escape "$(tls_blob_menu_text)")","profiles":$(all_profiles_json)}
+{"zapret2_running":$running,"strategy_locks_status":"$(json_escape "$(strategy_locks_status_text)")","hostlist_mode":"$(json_escape "$(config_mode_text hostlist "$CONFIG_FILE")")","fwtype":"$(json_escape "$(config_mode_text fwtype "$CONFIG_FILE")")","flowoffload":"$(json_escape "$(config_mode_text flowoffload "$CONFIG_FILE")")","tls_blob_mode":"$(json_escape "$(config_mode_text tls_blob_menu "$CONFIG_FILE")")","profiles":$(all_profiles_json)}
 EOF
 )"
 }
