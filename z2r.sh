@@ -1565,9 +1565,7 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "10")
-    echo -e "${yellow}Временно не работает${plain}"
-    # pause_entermenu_action_toggle_udp_range
-    
+    menu_action_toggle_udp_range
     pause_enter
     ;;
 
