@@ -76,14 +76,15 @@ check_dns() {
         | sort -u
     )
 
-    echo -e "${yellow}-> Эталонные IP от DoH:${plain}"
-    if [ -n "$DOH_IPS" ]; then
-        for ip in $DOH_IPS; do
-            echo "  $ip"
-        done
-    else
-        echo "  Не найдено"
+    if [ -z "$DOH_IPS" ]; then
+        echo -e "${red}[-] Ошибка: Google DoH не вернул IPv4 адреса${plain}"
+        return 1
     fi
+
+    echo -e "${yellow}-> Эталонные IP от DoH:${plain}"
+    for ip in $DOH_IPS; do
+        echo "  $ip"
+    done
 
     echo "----------------------------------------"
 
@@ -96,8 +97,11 @@ check_dns() {
 
     NS_IPS=$(
         echo "$NS_RAW" \
+        | awk '
+            /^Name:[[:space:]]/ { in_answer=1; next }
+            in_answer && /^Address([[:space:]][0-9]+)?:/ { print }
+        ' \
         | grep -E -o '([0-9]{1,3}\.){3}[0-9]{1,3}' \
-        | grep -v '^127\.0\.0\.1$' \
         | sort -u
     )
 
@@ -130,7 +134,7 @@ check_dns() {
     MATCH_COUNT=0
 
     for ip in $NS_IPS; do
-        if echo "$DOH_IPS" | grep -qx "$ip"; then
+        if echo "$DOH_IPS" | grep -Fxq "$ip"; then
             MATCH_IPS="$MATCH_IPS $ip"
             MATCH_COUNT=$((MATCH_COUNT + 1))
         fi
@@ -176,7 +180,9 @@ check_dns() {
 }
 
 check_access_list() {
-   check_dns "rutracker.org"
+   if ! check_dns "rutracker.org"; then
+      echo -e "${yellow}DNS-проверка завершилась предупреждением, продолжаю остальные тесты.${plain}"
+   fi
 
    echo "Проверка доступности youtube.com (YT TCP)"
    check_access "https://www.youtube.com/"
@@ -188,4 +194,3 @@ check_access_list() {
    check_access "https://www.instagram.com/"
 
 }
-
