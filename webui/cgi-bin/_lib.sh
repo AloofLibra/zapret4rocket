@@ -66,6 +66,7 @@ parse_params() {
     case "$key" in
       profile) PARAM_PROFILE="$value" ;;
       strategy) PARAM_STRATEGY="$value" ;;
+      action) PARAM_ACTION="$value" ;;
     esac
   done
 }
@@ -126,10 +127,18 @@ all_profiles_json() {
   printf ']'
 }
 
-restart_zapret2() {
+service_zapret2() {
+  local action="$1"
   set_zapret2_init
   [ -f "$ZAPRET2_INIT" ] || return 1
-  "$ZAPRET2_INIT" restart >/dev/null 2>&1
+  case "$action" in
+    start|stop|restart)
+      "$ZAPRET2_INIT" "$action" >/dev/null 2>&1
+      ;;
+    *)
+      return 2
+      ;;
+  esac
 }
 
 strategy_locks_status_text() {
@@ -244,7 +253,17 @@ api_clear_lock() {
 }
 
 api_restart() {
-  restart_zapret2 || send_error "500 Internal Server Error" "Не удалось перезапустить zapret2"
+  service_zapret2 restart || send_error "500 Internal Server Error" "Не удалось перезапустить zapret2"
+  send_json "200 OK" "{\"ok\":true}"
+}
+
+api_service() {
+  parse_params
+  case "${PARAM_ACTION:-}" in
+    start|stop|restart) ;;
+    *) send_error "400 Bad Request" "Некорректное действие" ;;
+  esac
+  service_zapret2 "$PARAM_ACTION" || send_error "500 Internal Server Error" "Не удалось выполнить команду zapret2"
   send_json "200 OK" "{\"ok\":true}"
 }
 

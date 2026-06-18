@@ -156,6 +156,52 @@ button.primary {
   box-shadow: var(--shadow-strong);
 }
 
+.service-control {
+  display: grid;
+  grid-template-columns: minmax(11rem, 1fr) 3.6rem;
+  align-items: stretch;
+  flex: 2 1 320px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-strong);
+  overflow: hidden;
+}
+
+.service-control button {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 3.3rem;
+}
+
+.service-control button:not(:disabled):hover {
+  box-shadow: none;
+}
+
+.service-toggle {
+  color: #ffffff;
+  font-weight: 700;
+  padding-inline: 1.2rem;
+}
+
+.service-toggle.is-start {
+  background: linear-gradient(135deg, var(--success) 0%, color-mix(in srgb, var(--success) 74%, #053b27) 100%);
+}
+
+.service-toggle.is-stop {
+  background: linear-gradient(135deg, var(--danger) 0%, color-mix(in srgb, var(--danger) 74%, #5a0712) 100%);
+}
+
+.service-restart {
+  border-left: 1px solid rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding-inline: 0;
+}
+
 button.ghost,
 .tab {
   background: var(--surface);
@@ -197,6 +243,7 @@ button.ghost {
 .meta-line,
 .check-title,
 .actions,
+.service-control,
 .card-actions,
 .tabs {
   min-width: 0;
@@ -342,6 +389,10 @@ h3 {
 
 .actions > button {
   flex: 1 1 180px;
+}
+
+.actions > .service-control {
+  flex: 2 1 320px;
 }
 
 .stats-grid,
@@ -609,6 +660,7 @@ input[type="number"]::-webkit-inner-spin-button {
   }
 
   .actions > button,
+  .actions > .service-control,
   .panel-header button {
     width: 100%;
     flex: 1 1 100%;

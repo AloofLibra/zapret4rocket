@@ -1173,6 +1173,7 @@ webui_install_files() {
   webui_repo_fetch "cgi-bin/locks.cgi" "$WEBUI_CGI/locks.cgi" || return 1
   webui_repo_fetch "cgi-bin/set-lock.cgi" "$WEBUI_CGI/set-lock.cgi" || return 1
   webui_repo_fetch "cgi-bin/clear-lock.cgi" "$WEBUI_CGI/clear-lock.cgi" || return 1
+  webui_repo_fetch "cgi-bin/service.cgi" "$WEBUI_CGI/service.cgi" || return 1
   webui_repo_fetch "cgi-bin/restart.cgi" "$WEBUI_CGI/restart.cgi" || return 1
   webui_repo_fetch "cgi-bin/check.cgi" "$WEBUI_CGI/check.cgi" || return 1
   webui_repo_fetch "cgi-bin/meta.cgi" "$WEBUI_CGI/meta.cgi" || return 1

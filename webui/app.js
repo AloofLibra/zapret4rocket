@@ -107,8 +107,25 @@ function switchView(view) {
   });
 }
 
+function renderServiceControls() {
+  const toggleButton = document.getElementById('toggle-service');
+  const restartButton = document.getElementById('restart-service');
+  if (!toggleButton || !restartButton || !state.status) return;
+
+  const running = Boolean(state.status.zapret2_running);
+  toggleButton.dataset.action = running ? 'stop' : 'start';
+  toggleButton.textContent = running ? 'Остановить zapret2' : 'Включить zapret2';
+  toggleButton.classList.toggle('is-stop', running);
+  toggleButton.classList.toggle('is-start', !running);
+
+  restartButton.disabled = !running;
+  restartButton.title = running ? 'Перезапустить zapret2' : 'zapret2 остановлен';
+  restartButton.setAttribute('aria-label', restartButton.title);
+}
+
 function renderStatus() {
   if (!state.status) return;
+  renderServiceControls();
 
   const statusCards = document.getElementById('status-cards');
   const statusProfiles = document.getElementById('status-profiles');
@@ -330,16 +347,36 @@ document.getElementById('refresh-locks').addEventListener('click', (event) => {
   withBusy(event.currentTarget, 'Обновление...', refreshAll).catch((e) => showBanner(e.message, 'error'));
 });
 
-document.getElementById('restart-service').addEventListener('click', async (event) => {
+async function runServiceAction(button, action) {
+  const labels = {
+    start: ['Включение...', 'zapret2 включен.'],
+    stop: ['Выключение...', 'zapret2 выключен.'],
+    restart: ['Перезапуск...', 'zapret2 перезапущен.'],
+  };
+  const [busyLabel, successMessage] = labels[action] || ['Выполнение...', 'Команда выполнена.'];
   try {
-    await withBusy(event.currentTarget, 'Перезапуск...', async () => {
-      await api('/cgi-bin/restart.cgi', { method: 'POST' });
-      await refreshAll();
+    setBusy(button, true, busyLabel);
+    await api('/cgi-bin/service.cgi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ action }),
     });
-    showBanner('zapret2 перезапущен.');
+    setBusy(button, false);
+    await refreshAll();
+    showBanner(successMessage);
   } catch (error) {
+    setBusy(button, false);
     showBanner(error.message, 'error');
   }
+}
+
+document.getElementById('toggle-service').addEventListener('click', (event) => {
+  const action = event.currentTarget.dataset.action || (state.status?.zapret2_running ? 'stop' : 'start');
+  runServiceAction(event.currentTarget, action);
+});
+
+document.getElementById('restart-service').addEventListener('click', (event) => {
+  runServiceAction(event.currentTarget, 'restart');
 });
 
 document.getElementById('run-check').addEventListener('click', async (event) => {
