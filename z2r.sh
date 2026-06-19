@@ -40,23 +40,82 @@ ZAPRET2_RELEASE_MIRROR_BASE="${ZAPRET2_RELEASE_MIRROR_BASE:-}"
 ZAPRET2_YANDEX_0952="${ZAPRET2_YANDEX_0952:-https://disk.yandex.ru/d/M26CLc7XCEV_og}"
 ZAPRET2_YANDEX_0952_OPENWRT="${ZAPRET2_YANDEX_0952_OPENWRT:-https://disk.yandex.ru/d/ER1R2TNw8f7KYA}"
 
+# Переменная для хранения флагов --resolve, если понадобятся
+RAW_DL_EXTRA_ARGS=""
+
 z2r_mirror_url() {
   printf '%s/%s?h=%s' "$Z2R_PROJECT_MIRROR_BASE" "$1" "$Z2R_BRANCH"
 }
 
+# Добавлен 3-й аргумент $3 для дополнительных флагов (например --resolve) и принудительный -k
 z2r_fetch_url_to_file() {
   local dest="$1"
   local url="$2"
+  local extra_args="$3"
 
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL -o "$dest" "$url"
+    curl -fsSL -k -o "$dest" $extra_args "$url"
     return $?
   fi
   if command -v wget >/dev/null 2>&1; then
-    wget -qO "$dest" "$url"
+    # Для wget не передаем extra_args (старые версии не знают --resolve и падают)
+    wget -q --no-check-certificate -O "$dest" "$url"
     return $?
   fi
   return 127
+}
+
+# === НОВЫЙ БЛОК: ПРОВЕРКА IP ЧЕРЕЗ DOH ===
+check_github_ips() {
+  if ! command -v curl >/dev/null 2>&1; then return 0; fi
+
+  echo "Проверка доступности raw.githubusercontent.com через Google DoH..."
+  local doh_response
+  doh_response=$(curl -sk --max-time 5 "https://dns.google/resolve?name=raw.githubusercontent.com&type=A" 2>/dev/null)
+
+  local all_ips
+  all_ips=$(echo "$doh_response" | grep -oE '"data":[[:space:]]*"([0-9]{1,3}\.){3}[0-9]{1,3}"' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}')
+
+  if [ -z "$all_ips" ]; then
+    echo "Не удалось получить IP через DoH. Использую стандартный DNS."
+    return 0
+  fi
+
+  local tmp_good="/tmp/z2r_good_ips_$$"
+  local tmp_bad="/tmp/z2r_bad_ips_$$"
+  rm -f "$tmp_good" "$tmp_bad"
+
+  for ip in $all_ips; do
+    (
+      if curl -sk --connect-timeout 10 -m 12 -o /dev/null -w "%{http_code}" "https://$ip" -H "Host: raw.githubusercontent.com" 2>/dev/null | grep -qE "^(2|3)[0-9]{2}$"; then
+        echo "$ip" >> "$tmp_good"
+      else
+        echo "$ip" >> "$tmp_bad"
+      fi
+    ) &
+  done
+  wait
+
+  local good_ips bad_ips ip_count good_count
+  good_ips=$(cat "$tmp_good" 2>/dev/null | tr '\n' ' ')
+  bad_ips=$(cat "$tmp_bad" 2>/dev/null | tr '\n' ' ')
+  ip_count=$(echo "$all_ips" | wc -w | tr -d ' ')
+  good_count=$(echo "$good_ips" | wc -w | tr -d ' ')
+
+  rm -f "$tmp_good" "$tmp_bad"
+
+  if [ "$ip_count" -gt 1 ] && [ "$good_count" -ge 1 ] && [ "$good_count" -lt "$ip_count" ]; then
+    echo -e "${yellow}⚠ Обнаружены нерабочие IP: $bad_ips${plain}"
+    echo -e "${green}✓ Принудительно использую рабочие IP: $good_ips${plain}"
+
+    for ip in $good_ips; do
+      RAW_DL_EXTRA_ARGS="$RAW_DL_EXTRA_ARGS --resolve raw.githubusercontent.com:443:$ip --resolve raw.githubusercontent.com:80:$ip"
+    done
+  elif [ "$good_count" -eq 0 ]; then
+    echo -e "${red}✗ Все IP raw.githubusercontent.com недоступны. Буду пытаться использовать зеркало.${plain}"
+  else
+    echo -e "${green}✓ Все IP raw.githubusercontent.com доступны.${plain}"
+  fi
 }
 
 z2r_download_project_file() {
@@ -69,13 +128,17 @@ z2r_download_project_file() {
   mirror="$(z2r_mirror_url "$rel")"
   mkdir -p "$(dirname "$dest")"
   rm -f "$tmp"
-  if z2r_fetch_url_to_file "$tmp" "$primary"; then
+
+  # Передаем $RAW_DL_EXTRA_ARGS для GitHub
+  if z2r_fetch_url_to_file "$tmp" "$primary" "$RAW_DL_EXTRA_ARGS"; then
     mv -f "$tmp" "$dest"
     return 0
   fi
   echo -e "${yellow}GitHub недоступен для $rel. Пробую зеркало.${plain}" >&2
   rm -f "$tmp"
-  if z2r_fetch_url_to_file "$tmp" "$mirror"; then
+
+  # Не передаем дополнительные аргументы для зеркала (пустая строка)
+  if z2r_fetch_url_to_file "$tmp" "$mirror" ""; then
     mv -f "$tmp" "$dest"
     return 0
   fi
@@ -110,13 +173,17 @@ z2r_download_upstream_file() {
   mirror="$(z2r_upstream_mirror_url "$rel")"
   mkdir -p "$(dirname "$dest")"
   rm -f "$tmp"
-  if z2r_fetch_url_to_file "$tmp" "$primary"; then
+
+  # Передаем $RAW_DL_EXTRA_ARGS для upstream GitHub (тоже raw.githubusercontent.com)
+  if z2r_fetch_url_to_file "$tmp" "$primary" "$RAW_DL_EXTRA_ARGS"; then
     mv -f "$tmp" "$dest"
     return 0
   fi
   echo -e "${yellow}GitHub недоступен для zapret2/$rel. Пробую зеркало.${plain}" >&2
   rm -f "$tmp"
-  if z2r_fetch_url_to_file "$tmp" "$mirror"; then
+
+  # Не передаем дополнительные аргументы для зеркала
+  if z2r_fetch_url_to_file "$tmp" "$mirror" ""; then
     mv -f "$tmp" "$dest"
     return 0
   fi
@@ -144,7 +211,7 @@ z2r_download_yandex_public_file() {
   local href
 
   rm -f "$api_tmp" "$dest"
-  if ! z2r_fetch_url_to_file "$api_tmp" "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key=$public_url"; then
+  if ! z2r_fetch_url_to_file "$api_tmp" "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key=$public_url" ""; then
     rm -f "$api_tmp"
     return 1
   fi
@@ -152,7 +219,7 @@ z2r_download_yandex_public_file() {
   rm -f "$api_tmp"
   [ -n "$href" ] || return 1
 
-  z2r_fetch_url_to_file "$dest" "$href"
+  z2r_fetch_url_to_file "$dest" "$href" ""
 }
 
 z2r_download_zapret2_release() {
@@ -164,7 +231,7 @@ z2r_download_zapret2_release() {
   local yadisk=""
 
   rm -f "$dest"
-  if z2r_fetch_url_to_file "$dest" "$primary"; then
+  if z2r_fetch_url_to_file "$dest" "$primary" ""; then
     return 0
   fi
   rm -f "$dest"
@@ -172,7 +239,7 @@ z2r_download_zapret2_release() {
   if [ -n "$ZAPRET2_RELEASE_MIRROR_BASE" ]; then
     mirror="${ZAPRET2_RELEASE_MIRROR_BASE%/}/v${ver}/${tarfile}"
     echo -e "${yellow}GitHub недоступен для $tarfile. Пробую зеркало zapret2 release.${plain}" >&2
-    if z2r_fetch_url_to_file "$dest" "$mirror"; then
+    if z2r_fetch_url_to_file "$dest" "$mirror" ""; then
       return 0
     fi
     rm -f "$dest"
@@ -195,7 +262,7 @@ z2r_exec_external_installer() {
   local tmp="/tmp/z2r_installer_$$"
 
   mirror="$(z2r_mirror_url "z2r")"
-  if z2r_fetch_url_to_file "$tmp" "$Z2R_INSTALLER_URL" || z2r_fetch_url_to_file "$tmp" "$mirror"; then
+  if z2r_fetch_url_to_file "$tmp" "$Z2R_INSTALLER_URL" "$RAW_DL_EXTRA_ARGS" || z2r_fetch_url_to_file "$tmp" "$mirror" ""; then
     exec sh "$tmp" "$@"
   fi
   rm -f "$tmp"
@@ -373,6 +440,9 @@ rst_guard_lua_update_from_repo() {
   echo -e "${green}rst-guard.lua обновлен из репозитория.${plain}"
 }
 
+# === ЗАПУСК ПРОВЕРКИ IP ЧЕРЕЗ DOH ПЕРЕД ПЕРВОЙ ЗАГРУЗКОЙ ===
+check_github_ips
+
 # Проверяем locked.lua, при отсутствии пробуем скачать из репозитория
 if [ -f /opt/zapret2/config ]; then
   if [ ! -s "$ORCH_LUA_LOCKED" ]; then
@@ -452,7 +522,7 @@ fallback_http_profile_try() {
 change_user() {
    if /opt/zapret2/nfq2/nfqws2 --dry-run --user="nobody" 2>&1 | grep -q "queue"; then
     echo "WS_USER=nobody"
-	sed -i 's/^#\(WS_USER=nobody\)/\1/' /opt/zapret2/config.default
+	  sed -i 's/^#\(WS_USER=nobody\)/\1/' /opt/zapret2/config.default
    elif /opt/zapret2/nfq2/nfqws2 --dry-run --user="$(head -n1 /etc/passwd | cut -d: -f1)" 2>&1 | grep -q "queue"; then
     echo "WS_USER=$(head -n1 /etc/passwd | cut -d: -f1)"
     sed -i "s/^#WS_USER=nobody$/WS_USER=$(head -n1 /etc/passwd | cut -d: -f1)/" "/opt/zapret2/config.default"
