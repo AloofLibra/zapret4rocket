@@ -1725,23 +1725,6 @@ else
     echo -e "${yellow}zeefeer обновлен (UTC +0): $commit_date ${plain}"
 fi
 
-#Проверка доступности raw.githubusercontent.com
-if [[ -z "$(curl -s --max-time 10 "https://raw.githubusercontent.com/test")" ]]; then
-    echo -e "${red}Не был получен доступ к raw.githubusercontent.com (таймаут 10 сек). Возможны проблемы при установке.${plain}"
-	if [ "$hardware" = "keenetic" ]; then
-		echo "Добавляем ip с от DNS 1.1.1.1 к raw.githubusercontent.com и пытаемся снова"
-		raw_ip="$(nslookup raw.githubusercontent.com 1.1.1.1 | awk '
-			/^Name: / {found=1; next}
-			found && /^Address [0-9]+: / {print $3}
-		' | tail -n1)"
-		if [ -n "$raw_ip" ]; then
-			ndmc -c "ip host raw.githubusercontent.com $raw_ip"
-		else
-			echo "Не удалось получить IP для raw.githubusercontent.com (nslookup пуст/ошибка). Пропуск ip host."
-		fi
-	fi
-fi
-
 #Выполнение общего для всех ОС кода с ответвлениями под ОС
 #Запрос на установку 3x-ui или аналогов для VPS
 if [[ "$OSystem" == "VPS" ]] && [ ! $1 ]; then
