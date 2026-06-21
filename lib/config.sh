@@ -233,7 +233,12 @@ config_profile_max_strategy() {
           }
       }
       function start_profile_if_needed() {
-          if (!in_template && !active && $0 ~ /^--/ && $0 !~ /^--new/ && $0 !~ /^--lua-init/ && $0 !~ /^--blob=/) {
+          if (!in_template && !active &&
+              $0 ~ /^--/ &&
+              $0 !~ /^--new/ &&
+              $0 !~ /^--lua-init/ &&
+              $0 !~ /^--blob=/ &&
+              $0 !~ /^--reasm-disable/) {
               prof++
               active=1
           }
