@@ -50,6 +50,60 @@ config_set_var() {
   fi
 }
 
+# Определяет Linux-имя WAN интерфейса по default route.
+# На Keenetic это может быть ppp0, eth*, nwg*, wwan0 и т.п.
+config_keenetic_detect_default_iface() {
+  local family="$1"
+
+  command -v ip >/dev/null 2>&1 || return 1
+  ip "-$family" route show default 2>/dev/null | awk '
+    {
+      for (i = 1; i <= NF; i++) {
+        if ($i == "dev" && $(i + 1) != "" && $(i + 1) != "lo") {
+          print $(i + 1)
+          exit
+        }
+      }
+    }
+  '
+}
+
+# Прописывает IFACE_WAN/IFACE_WAN6 в указанный конфиг только для Keenetic.
+# Если IPv6 default route не найден, IFACE_WAN6 не трогаем: zapret2 возьмёт IFACE_WAN.
+config_keenetic_set_wan_iface() {
+  local cfg="$1"
+  local wan4 wan6
+
+  [ "$hardware" = "keenetic" ] || return 0
+  [ -f "$cfg" ] || return 0
+
+  wan4="$(config_keenetic_detect_default_iface 4)"
+  wan6="$(config_keenetic_detect_default_iface 6)"
+
+  if [ -z "$wan4" ]; then
+    echo -e "${yellow}Не удалось автоматически определить WAN интерфейс Keenetic. IFACE_WAN не изменён.${plain}"
+    return 0
+  fi
+
+  config_set_var "$cfg" IFACE_WAN "\"$wan4\""
+  if [ -n "$wan6" ]; then
+    config_set_var "$cfg" IFACE_WAN6 "\"$wan6\""
+    if [ "$wan6" != "$wan4" ]; then
+      echo -e "${green}WAN интерфейсы Keenetic для $cfg: IPv4=$wan4, IPv6=$wan6${plain}"
+    else
+      echo -e "${green}WAN интерфейс Keenetic для $cfg: $wan4${plain}"
+    fi
+  else
+    echo -e "${green}WAN интерфейс Keenetic для $cfg: $wan4${plain}"
+  fi
+}
+
+# Применяет автоподстановку WAN к шаблону и рабочему конфигу, если они уже существуют.
+config_keenetic_set_wan_iface_all() {
+  config_keenetic_set_wan_iface /opt/zapret2/config.default
+  config_keenetic_set_wan_iface /opt/zapret2/config
+}
+
 config_tls_blob_mode_value() {
   local cfg
   local has_tls_maxru=0

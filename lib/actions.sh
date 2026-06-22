@@ -64,8 +64,16 @@ menu_action_update_config_reset() {
 
   # Раскомменчивание юзера под keenetic или merlin
   change_user
+  # На Keenetic автоматически подставляем WAN интерфейс в свежий шаблон конфига.
+  if [ "$hardware" = "keenetic" ]; then
+    config_keenetic_set_wan_iface /opt/zapret2/config.default
+  fi
 
   cp -f /opt/zapret2/config.default /opt/zapret2/config
+  # После копирования синхронизируем рабочий конфиг, чтобы reset не терял IFACE_WAN.
+  if [ "$hardware" = "keenetic" ]; then
+    config_keenetic_set_wan_iface /opt/zapret2/config
+  fi
 
   "$ZAPRET2_INIT" start
 

@@ -1778,6 +1778,8 @@ fi
 #Для Keenetic и merlin
 if [[ "$OSystem" == "entware" ]]; then
  entware_fixes
+ # На Keenetic прописываем IFACE_WAN по default route до запуска install_easy.sh.
+ config_keenetic_set_wan_iface_all
 fi
 
 #Для x-wrt
