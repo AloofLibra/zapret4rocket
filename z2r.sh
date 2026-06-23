@@ -402,6 +402,18 @@ set_zapret2_init() {
   export ZAPRET2_INIT
 }
 
+cleanup_zapret2_init_dirs() {
+  local init_dir="/opt/zapret2/init.d"
+
+  [ -d "$init_dir" ] || return 0
+
+  if [ "$OSystem" = "WRT" ]; then
+    rm -rf "$init_dir/sysv"
+  else
+    rm -rf "$init_dir/openwrt"
+  fi
+}
+
 ORCH_DIR="/opt/zapret2/extra_strats/cache/orchestra"
 ORCH_LUA_LOCKED="/opt/zapret2/lua/locked.lua"
 RST_GUARD_LUA="/opt/zapret2/lua/rst-guard.lua"
@@ -1022,11 +1034,13 @@ zapret_get() {
      echo -e "${red}zapret2 установлен некорректно: нет /opt/zapret2/install_easy.sh.${plain}"
      return 1
  fi
+ set_zapret2_init
 }
 
 #Запуск установочных скриптов и перезагрузка
 install_zapret_reboot() {
  sh -i /opt/zapret2/install_easy.sh
+ cleanup_zapret2_init_dirs
  "$ZAPRET2_INIT" restart
  if pidof nfqws2 >/dev/null; then
   check_access_list
