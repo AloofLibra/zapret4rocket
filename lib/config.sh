@@ -192,6 +192,13 @@ config_mode_text() {
         echo "выключен"
       fi
       ;;
+    reasm_disable)
+      if sed -n '/^NFQWS2_OPT="/,/^"$/p' "$cfg" | grep -q '^[[:space:]]*--reasm-disable'; then
+        echo "включено"
+      else
+        echo "выключено"
+      fi
+      ;;
     udp_games)
       if printf "%s" "$(config_get_var "$cfg" NFQWS2_PORTS_UDP)" | grep -Eq '(^|,)1026-65531(,|$)'; then
         echo "Включен"

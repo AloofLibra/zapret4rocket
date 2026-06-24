@@ -237,6 +237,53 @@ provider_submenu() {
   done
 }
 
+advanced_settings_submenu() {
+  while true; do
+    local current_state current_label
+    clear -x
+    current_state="$(config_mode_text reasm_disable /opt/zapret2/config)"
+    if [ "$current_state" = "включено" ]; then
+      current_label="${red}активирован${plain}"
+    elif [ "$current_state" = "выключено" ]; then
+      current_label="${cyan}отсутствует${plain}"
+    else
+      current_label="${yellow}недоступно${plain}"
+    fi
+
+    echo -e "${cyan}--- Дополнительные настройки ---${plain}"
+    echo ""
+    echo "Параметр --reasm-disable отключает склейку больших пакетов для анализа средствами NFQWS2."
+    echo "Он нужен только если на роутере не удается отключить аппаратное ускорение: NFQWS2 задерживает первый пакет, роутер отправляет второй напрямую, и соединение ломается."
+    echo -e "Проверка: откройте в новом инкогнито-окне ${cyan}https://img.reg.ru/news/showcase-main-page__hero-slider_image_domains.webp${plain}"
+    echo "Если картинка открывается, параметр обычно не нужен. Проблема чаще актуальна на Keenetic/Netcraze."
+    echo ""
+
+    submenu_item "1" "Параметр --reasm-disable. Сейчас: ${current_label}"
+    submenu_item "0" "Назад"
+    echo ""
+
+    read -re -p "Ваш выбор: " ans
+    case "$ans" in
+      "1")
+        if menu_action_toggle_reasm_disable; then
+          if pidof nfqws2 >/dev/null; then
+            "$ZAPRET2_INIT" restart
+            echo -e "${green}zapret2 перезапущен для применения изменений.${plain}"
+          fi
+        fi
+        pause_enter
+        ;;
+      "0"|"")
+        return
+        ;;
+      *)
+        echo -e "${yellow}Неверный ввод.${plain}"
+        sleep 1
+        ;;
+    esac
+  done
+}
+
 beginner_guide_menu() {
   clear -x
   echo -e "${Bblue}${Fplain} Не знаешь, с чего начать? Есть проблемы? ${plain}"

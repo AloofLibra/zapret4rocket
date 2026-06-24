@@ -192,6 +192,33 @@ menu_action_toggle_udp_range() {
   return 0
 }
 
+menu_action_toggle_reasm_disable() {
+  local cfg="/opt/zapret2/config"
+  local state
+
+  if [ ! -f "$cfg" ]; then
+    echo -e "${red}Файл конфигурации не найден: $cfg${plain}"
+    echo -e "${yellow}Пожалуйста, убедитесь, что zapret2 установлен и настроен.${plain}"
+    return 1
+  fi
+
+  state="$(config_mode_text reasm_disable "$cfg")"
+
+  if [ "$state" = "включено" ]; then
+    sed -i '/^[[:space:]]*--reasm-disable[[:space:]]*$/d' "$cfg" || return 1
+    echo -e "Параметр --reasm-disable: ${green}деактивирован${plain}."
+  else
+    if ! grep -q '^NFQWS2_OPT="' "$cfg"; then
+      echo -e "${red}Не найден блок NFQWS2_OPT в $cfg.${plain}"
+      return 1
+    fi
+    sed -i '/^NFQWS2_OPT="/a --reasm-disable' "$cfg" || return 1
+    echo -e "Параметр --reasm-disable: ${red}активирован${plain}."
+  fi
+
+  return 0
+}
+
 menu_action_set_tls_blob() {
   local cfg="/opt/zapret2/config"
   local fake_dir="/opt/zapret2/files/fake"
