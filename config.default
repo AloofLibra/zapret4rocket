@@ -237,7 +237,6 @@ NFQWS2_OPT="
 #Стратегии для голосовой связи. В первую очередь Discord, но может ещё для чего поможет
 --filter-udp=443,2053,2083,2087,2096,8443,50000-50099,1400,3478-3481,5349,19294-19344
 --filter-l7=discord,stun
---hostlist-exclude=/opt/zapret2/lists/netrogat.txt
 --lua-desync=circular_locked:key=6:allow_nohost=1
 --payload=discord_ip_discovery,stun
 --lua-desync=fake:blob=stun_fake:repeats=3:strategy=1 --lua-desync=fake:blob=discord_fake:repeats=3:strategy=1
