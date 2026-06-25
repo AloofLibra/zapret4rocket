@@ -98,23 +98,95 @@ zefeer_premium_777() {
 }
 
 zefeer_space_999() {
-  echo -e "${cyan}Секретный протокол 999: попытка связи с космосом...${plain}"
-  spinner_for_seconds 6 "Наводим тарелку на созвездие Пакетных Потерь"
+  local chars=(
+    ｱ ｲ ｳ ｴ ｵ ｶ ｷ ｸ ｹ ｺ ｻ ｼ ｽ ｾ ｿ ﾀ ﾁ ﾂ ﾃ ﾄ ﾅ ﾆ ﾇ ﾈ ﾉ
+    ﾊ ﾋ ﾌ ﾍ ﾎ ﾏ ﾐ ﾑ ﾒ ﾓ ﾔ ﾕ ﾖ ﾗ ﾘ ﾙ ﾚ ﾛ ﾜ ｦ ﾝ
+    0 1 2 3 4 5 6 7 8 9
+  )
+  local cols rows frames frame x y row tail ch key buf seq
+  local -a drops speeds
 
-  local excuse
-  excuse="$(rand_from_list \
-    "Меркурий не в том доме." \
-    "Вспышка на Солнце сбила сигнал." \
-    "Ретроградный NAT. Портал закрыт." \
-    "Слишком много DPI на орбите — сигнал дропнули." \
-    "Космос ответил RST." \
-    "Сигнал ушёл по QUIC, а обратно пришёл по SMTP." \
-    "Спутник занят: обновляет hostlist." \
-    "Астральный ipset переполнен." \
-    "Связь есть, но только с IPv6, а вы в IPv4 настроении." \
-    "Сбой калибровки антенны: /dev/space не найден." \
-  )"
+  cols="$(tput cols 2>/dev/null || echo 80)"
+  rows="$(tput lines 2>/dev/null || echo 24)"
 
-  echo -e "${red}Ошибка связи:${plain} ${yellow}${excuse}${plain}"
+  if (( cols < 20 || rows < 8 )); then
+    echo -e "${green}Wake up, zefeer...${plain}"
+    return 0
+  fi
+
+  matrix_999_cleanup() {
+    printf '\033[0m'
+    tput cnorm 2>/dev/null || true
+    clear
+  }
+
+  matrix_999_sleep() {
+    if command -v usleep >/dev/null 2>&1; then
+      usleep 30000
+    else
+      read -rsn1 -t 0.03 key 2>/dev/null || true
+    fi
+  }
+
+  trap 'matrix_999_cleanup; trap - INT TERM; return 0' INT TERM
+
+  clear
+  tput civis 2>/dev/null || true
+  printf '\033[1;2H\033[38;5;46mWake up, zefeer...\033[0m'
+
+  for (( x = 1; x <= cols; x += 2 )); do
+    drops[$x]=$((RANDOM % rows - 8))
+    speeds[$x]=$((RANDOM % 3 + 1))
+  done
+
+  frames=360
+  for (( frame = 0; frame < frames; frame++ )); do
+    buf=""
+    for (( x = 1; x <= cols; x += 2 )); do
+      (( frame % speeds[$x] == 0 )) || continue
+
+      y=${drops[$x]}
+
+      if (( y >= 2 && y <= rows )); then
+        ch="${chars[$((RANDOM % ${#chars[@]}))]}"
+        printf -v seq '\033[%s;%sH\033[97m%s' "$y" "$x" "$ch"
+        buf="${buf}${seq}"
+      fi
+
+      row=$((y - 1))
+      if (( row >= 2 && row <= rows )); then
+        ch="${chars[$((RANDOM % ${#chars[@]}))]}"
+        printf -v seq '\033[%s;%sH\033[38;5;118m%s' "$row" "$x" "$ch"
+        buf="${buf}${seq}"
+      fi
+
+      row=$((y - 3))
+      if (( row >= 2 && row <= rows )); then
+        ch="${chars[$((RANDOM % ${#chars[@]}))]}"
+        printf -v seq '\033[%s;%sH\033[38;5;34m%s' "$row" "$x" "$ch"
+        buf="${buf}${seq}"
+      fi
+
+      tail=$((y - 8))
+      if (( tail >= 2 && tail <= rows )); then
+        printf -v seq '\033[%s;%sH ' "$tail" "$x"
+        buf="${buf}${seq}"
+      fi
+
+      y=$((y + 1))
+      if (( y > rows + 8 )); then
+        y=$((0 - RANDOM % rows))
+      fi
+      drops[$x]=$y
+    done
+    printf '%b' "$buf"
+    matrix_999_sleep
+  done
+
+  matrix_999_cleanup
+  trap - INT TERM
+  unset -f matrix_999_sleep
+  unset -f matrix_999_cleanup
+  echo -e "${green}Матрица обновлена. Следуй за белым маршрутом.${plain}"
 }
 # ---- /ZEFEER PREMIUM ----
