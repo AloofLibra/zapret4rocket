@@ -192,6 +192,13 @@ config_mode_text() {
         echo "выключен"
       fi
       ;;
+    reasm_disable)
+      if sed -n '/^NFQWS2_OPT="/,/^"$/p' "$cfg" | grep -q '^[[:space:]]*--reasm-disable'; then
+        echo "включено"
+      else
+        echo "выключено"
+      fi
+      ;;
     udp_games)
       if printf "%s" "$(config_get_var "$cfg" NFQWS2_PORTS_UDP)" | grep -Eq '(^|,)1026-65531(,|$)'; then
         echo "Включен"
@@ -287,7 +294,12 @@ config_profile_max_strategy() {
           }
       }
       function start_profile_if_needed() {
-          if (!in_template && !active && $0 ~ /^--/ && $0 !~ /^--new/ && $0 !~ /^--lua-init/ && $0 !~ /^--blob=/) {
+          if (!in_template && !active &&
+              $0 ~ /^--/ &&
+              $0 !~ /^--new/ &&
+              $0 !~ /^--lua-init/ &&
+              $0 !~ /^--blob=/ &&
+              $0 !~ /^--reasm-disable/) {
               prof++
               active=1
           }
