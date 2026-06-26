@@ -223,6 +223,41 @@ if [ "$missing_libs" -ne 0 ]; then
   z2r_exec_external_installer "$@"
 fi
 
+#___Общие вспомогательные функции____
+
+# Нормализация введённого значения в чистый домен.
+# Убираем пробелы, схему (http/https/ftp), userinfo, путь, порт, крайние точки.
+# Глобальная функция: используется и в меню z2r.sh, и в lib/strategies.sh.
+# Возвращает 0 и печатает чистый домен, либо 1 (мусор/пусто).
+z2r_normalize_domain() {
+  local d="$1"
+  # обрезаем пробелы по краям
+  d="${d#"${d%%[![:space:]]*}"}"
+  d="${d%"${d##*[![:space:]]}"}"
+  [ -z "$d" ] && return 1
+  # приводим к нижнему регистру
+  d="$(printf '%s' "$d" | tr '[:upper:]' '[:lower:]')"
+  # убираем схему (http://, https://, ftp:// ...)
+  d="${d#*://}"
+  # убираем userinfo (всё до последнего @)
+  d="${d##*@}"
+  # убираем путь (всё после первого /)
+  d="${d%%/*}"
+  # убираем порт (всё после :)
+  d="${d%%:*}"
+  # убираем ведущую точку (.ru -> ru)
+  d="${d#.}"
+  # убираем завершающую точку (example.com. -> example.com)
+  d="${d%.}"
+  # пусто — отбрасываем
+  [ -z "$d" ] && return 1
+  # только допустимые символы: a-z 0-9 . -
+  case "$d" in *[!a-z0-9.-]*) return 1 ;; esac
+  # должен быть хотя бы один буквенно-цифровой символ
+  case "$d" in *[a-z0-9]*) : ;; *) return 1 ;; esac
+  printf '%s\n' "$d"
+}
+
 #___Сначала идут анонсы функций____
 
 # UI helpers (пауза/печать пунктов меню/совместимость старого кода)
@@ -1546,13 +1581,27 @@ Enter (без цифр) - переустановка/обновление zapret
 
   "6")
     read -re -p "Введите домен, который добавить в исключения (например, mydomain.com): " user_domain
+    exclude_file="/opt/zapret2/lists/netrogat.txt"
+    mkdir -p /opt/zapret2/lists
+
+    # Очистка файла от пустых строк
+    if [ -f "$exclude_file" ]; then
+      sed -i '/^[[:space:]]*$/d' "$exclude_file" 2>/dev/null || true
+    fi
+
     if [ -n "$user_domain" ]; then
-      exclude_file="/opt/zapret2/lists/netrogat.txt"
-      mkdir -p /opt/zapret2/lists
-      if ! grep -Fxq "$user_domain" "$exclude_file" 2>/dev/null; then
-        echo "$user_domain" >> "$exclude_file"
+      if clean_domain="$(z2r_normalize_domain "$user_domain")"; then
+        # проверка на дубликат (регистронезависимо, точное совпадение строки)
+        if grep -Fixq "$clean_domain" "$exclude_file" 2>/dev/null; then
+          echo -e "Домен ${yellow}$clean_domain${plain} уже есть в исключениях (netrogat.txt)."
+        else
+          echo "$clean_domain" >> "$exclude_file"
+          echo -e "Домен ${yellow}$clean_domain${plain} добавлен в исключения (netrogat.txt)."
+        fi
+      else
+        echo -e "${red}Не удалось распознать домен из ввода:${plain} ${yellow}$user_domain${plain}"
+        echo -e "Укажите домен или ссылку, например: example.com или https://www.youtube.com/watch?v=..."
       fi
-      echo -e "Домен ${yellow}$user_domain${plain} добавлен в исключения (netrogat.txt)."
     else
       echo "Ввод пустой, ничего не добавлено"
     fi

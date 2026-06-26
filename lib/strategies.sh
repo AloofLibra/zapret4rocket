@@ -171,6 +171,15 @@ manage_custom_rkn_domain() {
         return 0
     fi
 
+    # Нормализация: отсекаем схему (http/https), порт, путь, крайние точки и т.п.
+    # Функция z2r_normalize_domain() определена глобально в z2r.sh до подключения lib.
+    if ! user_domain="$(z2r_normalize_domain "$user_domain")"; then
+        echo -e "${red}Не удалось распознать домен из ввода.${plain}"
+        echo -e "Укажите домен или ссылку, например: example.com или https://www.youtube.com/watch?v=..."
+        pause_enter
+        return 0
+    fi
+
     echo "1 - только добавить домен в список TCP_Custom"
     echo "2 - добавить и подобрать стратегию для этого домена"
     echo "0 - отмена"
@@ -197,6 +206,8 @@ manage_custom_rkn_domain() {
     custom_file="/opt/zapret2/extra_strats/TCP_Custom.txt"
     mkdir -p /opt/zapret2/extra_strats
     touch "$custom_file" 2>/dev/null || true
+    # Очистка файла от пустых строк
+    sed -i '/^[[:space:]]*$/d' "$custom_file" 2>/dev/null || true
     if ! grep -Fxq "$user_domain" "$custom_file" 2>/dev/null; then
         echo "$user_domain" >> "$custom_file"
         echo -e "${green}Домен $user_domain добавлен в $custom_file${plain}"
