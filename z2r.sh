@@ -39,9 +39,6 @@ ZAPRET2_RELEASE_BASE="${ZAPRET2_RELEASE_BASE:-https://github.com/bol-van/zapret2
 ZAPRET2_RELEASE_MIRROR_BASE="${ZAPRET2_RELEASE_MIRROR_BASE:-}"
 ZAPRET2_YANDEX_0952="${ZAPRET2_YANDEX_0952:-https://disk.yandex.ru/d/M26CLc7XCEV_og}"
 ZAPRET2_YANDEX_0952_OPENWRT="${ZAPRET2_YANDEX_0952_OPENWRT:-https://disk.yandex.ru/d/ER1R2TNw8f7KYA}"
-# Дополнительные аргументы curl для raw.githubusercontent.com.
-# Заполняется только после проверки IP через DoH; TLS-проверку не отключаем.
-RAW_DL_EXTRA_ARGS=""
 
 z2r_mirror_url() {
   printf '%s/%s?h=%s' "$Z2R_PROJECT_MIRROR_BASE" "$1" "$Z2R_BRANCH"
@@ -50,12 +47,9 @@ z2r_mirror_url() {
 z2r_fetch_url_to_file() {
   local dest="$1"
   local url="$2"
-  # Третий аргумент нужен для curl --resolve. wget его не получает:
-  # старые сборки wget на роутерах не поддерживают аналогичный режим.
-  local extra_args="${3:-}"
 
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL -o "$dest" $extra_args "$url"
+    curl -fsSL -o "$dest" "$url"
     return $?
   fi
   if command -v wget >/dev/null 2>&1; then
@@ -63,50 +57,6 @@ z2r_fetch_url_to_file() {
     return $?
   fi
   return 127
-}
-
-# Проверяем IP raw.githubusercontent.com через DoH и выбираем первый доступный.
-# Важно: проверка идет через curl --resolve к исходному hostname, поэтому
-# сертификат проверяется как обычно. -k/--insecure здесь намеренно не нужен.
-z2r_prepare_raw_github_resolve() {
-  local doh_response all_ips ip
-  local tmp_good="/tmp/z2r_raw_good_ips_$$"
-  local probe_url="https://raw.githubusercontent.com/"
-
-  [ -z "$RAW_DL_EXTRA_ARGS" ] || return 0
-  command -v curl >/dev/null 2>&1 || return 0
-
-  echo "Проверка доступности raw.githubusercontent.com через Google DoH..."
-  doh_response="$(curl -fsSL --max-time 5 "https://dns.google/resolve?name=raw.githubusercontent.com&type=A" 2>/dev/null || true)"
-  all_ips="$(echo "$doh_response" | grep -oE '"data":[[:space:]]*"([0-9]{1,3}\.){3}[0-9]{1,3}"' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' || true)"
-
-  if [ -z "$all_ips" ]; then
-    echo "Не удалось получить IP через DoH. Использую стандартный DNS."
-    return 0
-  fi
-
-  # Проверяем IP параллельно, чтобы не задерживать запуск на плохих адресах.
-  rm -f "$tmp_good"
-  for ip in $all_ips; do
-    (
-      if curl -sS --connect-timeout 5 -m 8 -o /dev/null --resolve "raw.githubusercontent.com:443:$ip" "$probe_url" >/dev/null 2>&1; then
-        echo "$ip" >> "$tmp_good"
-      fi
-    ) &
-  done
-  wait
-
-  ip="$(head -n1 "$tmp_good" 2>/dev/null || true)"
-  rm -f "$tmp_good"
-
-  if [ -n "$ip" ]; then
-    # Принудительно используем найденный IP только для GitHub raw.
-    # Остальные домены и зеркала скачиваются без этих аргументов.
-    RAW_DL_EXTRA_ARGS="--resolve raw.githubusercontent.com:443:$ip --resolve raw.githubusercontent.com:80:$ip"
-    echo -e "${green}raw.githubusercontent.com: принудительно использую IP $ip${plain}"
-  else
-    echo -e "${yellow}Не найден доступный IP raw.githubusercontent.com. При ошибке загрузки будет использовано зеркало.${plain}"
-  fi
 }
 
 z2r_download_project_file() {
@@ -119,15 +69,13 @@ z2r_download_project_file() {
   mirror="$(z2r_mirror_url "$rel")"
   mkdir -p "$(dirname "$dest")"
   rm -f "$tmp"
-  # Для GitHub raw передаем RAW_DL_EXTRA_ARGS, если DoH-проверка нашла рабочий IP.
-  if z2r_fetch_url_to_file "$tmp" "$primary" "$RAW_DL_EXTRA_ARGS"; then
+  if z2r_fetch_url_to_file "$tmp" "$primary"; then
     mv -f "$tmp" "$dest"
     return 0
   fi
   echo -e "${yellow}GitHub недоступен для $rel. Пробую зеркало.${plain}" >&2
   rm -f "$tmp"
-  # Для зеркала --resolve raw.githubusercontent.com не нужен.
-  if z2r_fetch_url_to_file "$tmp" "$mirror" ""; then
+  if z2r_fetch_url_to_file "$tmp" "$mirror"; then
     mv -f "$tmp" "$dest"
     return 0
   fi
@@ -162,15 +110,13 @@ z2r_download_upstream_file() {
   mirror="$(z2r_upstream_mirror_url "$rel")"
   mkdir -p "$(dirname "$dest")"
   rm -f "$tmp"
-  # Upstream zapret2 тоже лежит на raw.githubusercontent.com.
-  if z2r_fetch_url_to_file "$tmp" "$primary" "$RAW_DL_EXTRA_ARGS"; then
+  if z2r_fetch_url_to_file "$tmp" "$primary"; then
     mv -f "$tmp" "$dest"
     return 0
   fi
   echo -e "${yellow}GitHub недоступен для zapret2/$rel. Пробую зеркало.${plain}" >&2
   rm -f "$tmp"
-  # Зеркало upstream скачиваем обычным способом.
-  if z2r_fetch_url_to_file "$tmp" "$mirror" ""; then
+  if z2r_fetch_url_to_file "$tmp" "$mirror"; then
     mv -f "$tmp" "$dest"
     return 0
   fi
@@ -198,7 +144,7 @@ z2r_download_yandex_public_file() {
   local href
 
   rm -f "$api_tmp" "$dest"
-  if ! z2r_fetch_url_to_file "$api_tmp" "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key=$public_url" ""; then
+  if ! z2r_fetch_url_to_file "$api_tmp" "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key=$public_url"; then
     rm -f "$api_tmp"
     return 1
   fi
@@ -206,7 +152,7 @@ z2r_download_yandex_public_file() {
   rm -f "$api_tmp"
   [ -n "$href" ] || return 1
 
-  z2r_fetch_url_to_file "$dest" "$href" ""
+  z2r_fetch_url_to_file "$dest" "$href"
 }
 
 z2r_download_zapret2_release() {
@@ -218,7 +164,7 @@ z2r_download_zapret2_release() {
   local yadisk=""
 
   rm -f "$dest"
-  if z2r_fetch_url_to_file "$dest" "$primary" ""; then
+  if z2r_fetch_url_to_file "$dest" "$primary"; then
     return 0
   fi
   rm -f "$dest"
@@ -226,7 +172,7 @@ z2r_download_zapret2_release() {
   if [ -n "$ZAPRET2_RELEASE_MIRROR_BASE" ]; then
     mirror="${ZAPRET2_RELEASE_MIRROR_BASE%/}/v${ver}/${tarfile}"
     echo -e "${yellow}GitHub недоступен для $tarfile. Пробую зеркало zapret2 release.${plain}" >&2
-    if z2r_fetch_url_to_file "$dest" "$mirror" ""; then
+    if z2r_fetch_url_to_file "$dest" "$mirror"; then
       return 0
     fi
     rm -f "$dest"
@@ -249,7 +195,7 @@ z2r_exec_external_installer() {
   local tmp="/tmp/z2r_installer_$$"
 
   mirror="$(z2r_mirror_url "z2r")"
-  if z2r_fetch_url_to_file "$tmp" "$Z2R_INSTALLER_URL" "$RAW_DL_EXTRA_ARGS" || z2r_fetch_url_to_file "$tmp" "$mirror" ""; then
+  if z2r_fetch_url_to_file "$tmp" "$Z2R_INSTALLER_URL" || z2r_fetch_url_to_file "$tmp" "$mirror"; then
     exec sh "$tmp" "$@"
   fi
   rm -f "$tmp"
@@ -261,11 +207,6 @@ z2r_exec_external_installer() {
 
 #Определяем путь скрипта, подгружаем функции
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
-
-# DoH-проверка должна выполниться до bootstrap-перехода во внешний z2r:
-# если локальных lib-файлов нет, z2r_exec_external_installer уже будет знать
-# рабочий IP raw.githubusercontent.com или быстро уйдет на зеркало.
-z2r_prepare_raw_github_resolve
 
 # Проверяем наличие всех нужных lib-файлов, иначе запускаем внешний скрипт
 missing_libs=0
