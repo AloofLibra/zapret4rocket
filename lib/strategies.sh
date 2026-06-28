@@ -159,10 +159,59 @@ get_orchestra_locks_info() {
         "$(fmt_status_num "$fb_http")"
 }
 
+# Путь к файлу списка кастомных доменов TCP_Custom (RKN-обработка).
+custom_rkn_file() {
+    echo "/opt/zapret2/extra_strats/TCP_Custom.txt"
+}
+
+# Полное удаление домена из TCP_Custom:
+#  - убирает точное совпадение домена из TCP_Custom.txt и чистит пустые строки;
+#  - снимает лок стратегии для домена в текущем ORCH_LOCK_FILE по всем протоколам.
+# Числовые (профильные) строки не затрагиваются, т.к. $1 - домен.
+custom_rkn_remove_domain() {
+    local domain="$1"
+    local custom_file tmp
+    [ -n "$domain" ] || return 1
+    custom_file="$(custom_rkn_file)"
+    [ -f "$custom_file" ] || return 0
+
+    tmp="${custom_file}.tmp.$$"
+    # Оставляем все строки, кроме точного совпадения с доменом
+    grep -Fxv -- "$domain" "$custom_file" > "$tmp" 2>/dev/null || true
+    mv -f "$tmp" "$custom_file" 2>/dev/null || true
+    # Чистим пустые строки
+    sed -i '/^[[:space:]]*$/d' "$custom_file" 2>/dev/null || true
+
+    # Снимаем лок стратегии для домена по всем протоколам
+    orch_locked_clear "$domain" "tls"
+    orch_locked_clear "$domain" "http"
+    orch_locked_clear "$domain" "udp"
+    return 0
+}
+
+custom_rkn_add_domain() {
+    local domain="$1"
+    local custom_file
+    [ -n "$domain" ] || return 1
+    custom_file="$(custom_rkn_file)"
+    mkdir -p /opt/zapret2/extra_strats
+    touch "$custom_file" 2>/dev/null || true
+    sed -i '/^[[:space:]]*$/d' "$custom_file" 2>/dev/null || true
+
+    if ! grep -Fxq "$domain" "$custom_file" 2>/dev/null; then
+        echo "$domain" >> "$custom_file"
+        echo -e "${green}Домен $domain добавлен в $custom_file${plain}"
+    else
+        echo -e "${yellow}Домен $domain уже есть в $custom_file${plain}"
+    fi
+}
+
 manage_custom_rkn_domain() {
     local user_domain="" test_url="" custom_file="" mode="" strategy_num=""
     local max_strat="" current_strat="" prev_strat="" answer=""
     local only_add=0
+    local need_mode_prompt=1
+    local existing_strat=""
 
     read -re -p "Введите домен для добавления в TCP_Custom (RKN-обработка, например example.com): " user_domain
     if [ -z "$user_domain" ]; then
@@ -180,40 +229,71 @@ manage_custom_rkn_domain() {
         return 0
     fi
 
-    echo "1 - только добавить домен в список TCP_Custom"
-    echo "2 - добавить и подобрать стратегию для этого домена"
-    echo "0 - отмена"
-    read -re -p "Ваш выбор: " mode
-
-    case "$mode" in
-        "1")
-            only_add=1
-            ;;
-        "2")
-            ;;
-        "0"|"")
-            echo "Отменено."
-            pause_enter
-            return 0
-            ;;
-        *)
-            echo "Отменено."
-            pause_enter
-            return 0
-            ;;
-    esac
-
-    custom_file="/opt/zapret2/extra_strats/TCP_Custom.txt"
+    custom_file="$(custom_rkn_file)"
     mkdir -p /opt/zapret2/extra_strats
     touch "$custom_file" 2>/dev/null || true
     # Очистка файла от пустых строк
     sed -i '/^[[:space:]]*$/d' "$custom_file" 2>/dev/null || true
-    if ! grep -Fxq "$user_domain" "$custom_file" 2>/dev/null; then
-        echo "$user_domain" >> "$custom_file"
-        echo -e "${green}Домен $user_domain добавлен в $custom_file${plain}"
-    else
-        echo -e "${yellow}Домен $user_domain уже есть в $custom_file${plain}"
+
+    # Проверка: существует ли уже домен и есть ли для него подобранная стратегия.
+    if grep -Fxq "$user_domain" "$custom_file" 2>/dev/null; then
+        existing_strat="$(orch_locked_get "$user_domain" "tls")"
+        if printf "%s" "$existing_strat" | grep -Eq '^[0-9]+$' && [ "$existing_strat" -gt 0 ]; then
+            echo -e "${yellow}Домен $user_domain уже есть в TCP_Custom, для него подобрана стратегия ${existing_strat}.${plain}"
+            echo "1 - подобрать новую стратегию"
+            echo "2 - удалить домен и заново добавить (без подбора стратегии)"
+            echo "0 - отменить и оставить всё как есть"
+            read -re -p "Ваш выбор: " mode
+            case "$mode" in
+                "1")
+                    echo -e "${green}Домен $user_domain оставлен в TCP_Custom, запускаю подбор новой стратегии.${plain}"
+                    only_add=0
+                    need_mode_prompt=0
+                    ;;
+                "2")
+                    custom_rkn_remove_domain "$user_domain"
+                    echo -e "${green}Домен $user_domain удалён, добавляю заново.${plain}"
+                    only_add=1
+                    need_mode_prompt=0
+                    ;;
+                *)
+                    echo "Отменено. Всё оставлено как есть."
+                    pause_enter
+                    return 0
+                    ;;
+            esac
+        else
+            echo -e "${yellow}Домен $user_domain уже есть в TCP_Custom, общие стратегии RKN.${plain}"
+            # Падаем в обычный выбор режима: добавление будет no-op, но можно подобрать стратегию.
+        fi
     fi
+
+    if [ "$need_mode_prompt" -eq 1 ]; then
+        echo "1 - только добавить домен в список TCP_Custom"
+        echo "2 - добавить и подобрать стратегию для этого домена"
+        echo "0 - отмена"
+        read -re -p "Ваш выбор: " mode
+
+        case "$mode" in
+            "1")
+                only_add=1
+                ;;
+            "2")
+                ;;
+            "0"|"")
+                echo "Отменено."
+                pause_enter
+                return 0
+                ;;
+            *)
+                echo "Отменено."
+                pause_enter
+                return 0
+                ;;
+        esac
+    fi
+
+    custom_rkn_add_domain "$user_domain"
 
     if [ "$only_add" -eq 1 ]; then
         pause_enter
@@ -230,6 +310,9 @@ manage_custom_rkn_domain() {
         current_strat=1
     fi
     prev_strat="$(orch_locked_get "$user_domain" "tls")"
+    if ! printf "%s" "$prev_strat" | grep -Eq '^[0-9]+$' || [ "$prev_strat" -le 0 ]; then
+        prev_strat="$existing_strat"
+    fi
 
     read -re -p "Введите номер стратегии для старта (Enter - текущая $current_strat): " strategy_num
     if [ -z "$strategy_num" ]; then
@@ -271,6 +354,95 @@ manage_custom_rkn_domain() {
     fi
     echo "Изменения по стратегии для домена отменены."
     pause_enter
+}
+
+# Просмотр и удаление доменов из TCP_Custom (пункт 11 меню стратегий).
+# Выводит список доменов с номерами и подобранными стратегиями (из locked.tsv),
+# позволяет удалить выбранный домен с очисткой обоих файлов.
+manage_custom_rkn_list() {
+    local custom_file choice confirm i strat target tstrat line
+    local domains=()
+
+    custom_file="$(custom_rkn_file)"
+    mkdir -p /opt/zapret2/extra_strats
+    touch "$custom_file" 2>/dev/null || true
+    sed -i '/^[[:space:]]*$/d' "$custom_file" 2>/dev/null || true
+
+    while true; do
+        clear -x
+        echo -e "${cyan}--- TCP_Custom: домены и стратегии ---${plain}"
+        echo ""
+
+        # Собираем непустые домены в массив
+        domains=()
+        while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            domains+=("$line")
+        done < "$custom_file"
+
+        if [ "${#domains[@]}" -eq 0 ]; then
+            echo -e "${yellow}Список TCP_Custom пуст. Домены добавляются через пункт 10.${plain}"
+            echo ""
+            pause_enter
+            return 0
+        fi
+
+        echo -e "${yellow}Домены в TCP_Custom и подобранные стратегии:${plain}"
+        echo ""
+        i=1
+        for d in "${domains[@]}"; do
+            strat="$(orch_locked_get "$d" "tls")"
+            if printf "%s" "$strat" | grep -Eq '^[0-9]+$' && [ "$strat" -gt 0 ]; then
+                printf "  ${Fcyan}%s.${plain} ${green}%s${plain} [стратегия ${Fcyan}%s${plain}]\n" "$i" "$d" "$strat"
+            else
+                printf "  ${Fcyan}%s.${plain} ${green}%s${plain} [${yellow}Стратегии RKN${plain}]\n" "$i" "$d"
+            fi
+            i=$((i+1))
+        done
+        echo ""
+        echo -e "Введите номер домена для удаления, ${Fyellow}0${plain} - назад."
+        read -re -p "Ваш выбор: " choice
+
+        case "$choice" in
+            "0"|"")
+                return 0
+                ;;
+            *)
+                if ! printf "%s" "$choice" | grep -Eq '^[0-9]+$'; then
+                    echo -e "${red}Некорректный ввод.${plain}"
+                    sleep 1
+                    continue
+                fi
+                if [ "$choice" -lt 1 ] || [ "$choice" -gt "${#domains[@]}" ]; then
+                    echo -e "${red}Номер вне диапазона.${plain}"
+                    sleep 1
+                    continue
+                fi
+                target="${domains[$((choice-1))]}"
+                tstrat="$(orch_locked_get "$target" "tls")"
+                echo -e "${yellow}Удалить домен $target"
+                if printf "%s" "$tstrat" | grep -Eq '^[0-9]+$' && [ "$tstrat" -gt 0 ]; then
+                    echo -e "(стратегия $tstrat для домена будет также очищена)?${plain}"
+                else
+                    echo -e "(стратегия не была подобрана)?${plain}"
+                fi
+                echo "1 - да, удалить"
+                echo "0 - отмена"
+                read -re -p "Ваш выбор: " confirm
+                case "$confirm" in
+                    "1")
+                        custom_rkn_remove_domain "$target"
+                        echo -e "${green}Домен $target удалён из TCP_Custom и locked.tsv.${plain}"
+                        pause_enter
+                        ;;
+                    *)
+                        echo "Отменено."
+                        sleep 1
+                        ;;
+                esac
+                ;;
+        esac
+    done
 }
 
 #Функция для функции подбора стратегий
