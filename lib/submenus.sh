@@ -33,6 +33,7 @@ strategies_submenu() {
     submenu_item "	9" "Fallback HTTP (безразборный блок) [${p9_max:-0}]"
     submenu_item "	10" "Добавить домен в TCP_Custom (RKN-обработка, с/без подбора стратегии)"
     submenu_item "	11" "Просмотр/удаление доменов TCP_Custom (с номерами стратегий)"
+    submenu_item "	12" "Просмотр/удаление доменов netrogat.txt (лист исключений)"
     submenu_item "	0" "Назад"
     echo ""
 
@@ -74,6 +75,9 @@ strategies_submenu() {
         ;;
       "11")
         manage_custom_rkn_list
+        ;;
+      "12")
+        manage_netrogat_list
         ;;
       "0"|"")
         return
