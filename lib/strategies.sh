@@ -468,7 +468,39 @@ netrogat_remove_domain() {
     return 0
 }
 
-# Просмотр и удаление доменов из листа исключений netrogat.txt (пункт 12 меню стратегий).
+# Добавление домена в netrogat.txt:
+#  - нормализует ввод, проверяет дубликат, чистит пустые строки.
+netrogat_add_domain() {
+    local user_domain="" clean_domain="" net_file
+    net_file="$(netrogat_file)"
+    mkdir -p /opt/zapret2/lists
+    touch "$net_file" 2>/dev/null || true
+    # Очистка файла от пустых строк
+    sed -i '/^[[:space:]]*$/d' "$net_file" 2>/dev/null || true
+
+    read -re -p "Введите домен, который добавить в исключения (например, mydomain.com): " user_domain
+    if [ -z "$user_domain" ]; then
+        echo "Ввод пустой, ничего не добавлено"
+        pause_enter
+        return 0
+    fi
+
+    if clean_domain="$(z2r_normalize_domain "$user_domain")"; then
+        # проверка на дубликат (регистронезависимо, точное совпадение строки)
+        if grep -Fixq "$clean_domain" "$net_file" 2>/dev/null; then
+            echo -e "Домен ${yellow}$clean_domain${plain} уже есть в исключениях (netrogat.txt)."
+        else
+            echo "$clean_domain" >> "$net_file"
+            echo -e "Домен ${yellow}$clean_domain${plain} добавлен в исключения (netrogat.txt)."
+        fi
+    else
+        echo -e "${red}Не удалось распознать домен из ввода:${plain} ${yellow}$user_domain${plain}"
+        echo -e "Укажите домен или ссылку, например: example.com или https://www.youtube.com/watch?v=..."
+    fi
+    pause_enter
+}
+
+# Просмотр и удаление доменов из листа исключений netrogat.txt.
 # Выводит список доменов с номерами, позволяет удалить выбранный домен.
 # Чистит пустые строки.
 manage_netrogat_list() {
