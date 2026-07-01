@@ -445,6 +445,139 @@ manage_custom_rkn_list() {
     done
 }
 
+# Путь к файлу листа исключений netrogat.txt.
+netrogat_file() {
+    echo "/opt/zapret2/lists/netrogat.txt"
+}
+
+# Удаление домена из netrogat.txt:
+#  - убирает точное совпадение домена из файла и чистит пустые строки.
+netrogat_remove_domain() {
+    local domain="$1"
+    local net_file tmp
+    [ -n "$domain" ] || return 1
+    net_file="$(netrogat_file)"
+    [ -f "$net_file" ] || return 0
+
+    tmp="${net_file}.tmp.$$"
+    # Оставляем все строки, кроме точного совпадения с доменом
+    grep -Fxv -- "$domain" "$net_file" > "$tmp" 2>/dev/null || true
+    mv -f "$tmp" "$net_file" 2>/dev/null || true
+    # Чистим пустые строки
+    sed -i '/^[[:space:]]*$/d' "$net_file" 2>/dev/null || true
+    return 0
+}
+
+# Добавление домена в netrogat.txt:
+#  - нормализует ввод, проверяет дубликат, чистит пустые строки.
+netrogat_add_domain() {
+    local user_domain="" clean_domain="" net_file
+    net_file="$(netrogat_file)"
+    mkdir -p /opt/zapret2/lists
+    touch "$net_file" 2>/dev/null || true
+    # Очистка файла от пустых строк
+    sed -i '/^[[:space:]]*$/d' "$net_file" 2>/dev/null || true
+
+    read -re -p "Введите домен, который добавить в исключения (например, mydomain.com): " user_domain
+    if [ -z "$user_domain" ]; then
+        echo "Ввод пустой, ничего не добавлено"
+        pause_enter
+        return 0
+    fi
+
+    if clean_domain="$(z2r_normalize_domain "$user_domain")"; then
+        # проверка на дубликат (регистронезависимо, точное совпадение строки)
+        if grep -Fixq "$clean_domain" "$net_file" 2>/dev/null; then
+            echo -e "Домен ${yellow}$clean_domain${plain} уже есть в исключениях (netrogat.txt)."
+        else
+            echo "$clean_domain" >> "$net_file"
+            echo -e "Домен ${yellow}$clean_domain${plain} добавлен в исключения (netrogat.txt)."
+        fi
+    else
+        echo -e "${red}Не удалось распознать домен из ввода:${plain} ${yellow}$user_domain${plain}"
+        echo -e "Укажите домен или ссылку, например: example.com или https://www.youtube.com/watch?v=..."
+    fi
+    pause_enter
+}
+
+# Просмотр и удаление доменов из листа исключений netrogat.txt.
+# Выводит список доменов с номерами, позволяет удалить выбранный домен.
+# Чистит пустые строки.
+manage_netrogat_list() {
+    local net_file choice confirm i target line
+    local domains=()
+
+    net_file="$(netrogat_file)"
+    mkdir -p /opt/zapret2/lists
+    touch "$net_file" 2>/dev/null || true
+    sed -i '/^[[:space:]]*$/d' "$net_file" 2>/dev/null || true
+
+    while true; do
+        clear -x
+        echo -e "${cyan}--- netrogat.txt: домены-исключения ---${plain}"
+        echo ""
+
+        # Собираем непустые домены в массив
+        domains=()
+        while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            domains+=("$line")
+        done < "$net_file"
+
+        if [ "${#domains[@]}" -eq 0 ]; then
+            echo -e "${yellow}Список netrogat.txt пуст.${plain}"
+            echo ""
+            pause_enter
+            return 0
+        fi
+
+        echo -e "${yellow}Домены в netrogat.txt (лист исключений):${plain}"
+        echo ""
+        i=1
+        for d in "${domains[@]}"; do
+            printf "  ${Fcyan}%s.${plain} ${green}%s${plain}\n" "$i" "$d"
+            i=$((i+1))
+        done
+        echo ""
+        echo -e "Введите номер домена для удаления, ${Fyellow}0${plain} - назад."
+        read -re -p "Ваш выбор: " choice
+
+        case "$choice" in
+            "0"|"")
+                return 0
+                ;;
+            *)
+                if ! printf "%s" "$choice" | grep -Eq '^[0-9]+$'; then
+                    echo -e "${red}Некорректный ввод.${plain}"
+                    sleep 1
+                    continue
+                fi
+                if [ "$choice" -lt 1 ] || [ "$choice" -gt "${#domains[@]}" ]; then
+                    echo -e "${red}Номер вне диапазона.${plain}"
+                    sleep 1
+                    continue
+                fi
+                target="${domains[$((choice-1))]}"
+                echo -e "${yellow}Удалить домен $target из netrogat.txt?${plain}"
+                echo "1 - да, удалить"
+                echo "0 - отмена"
+                read -re -p "Ваш выбор: " confirm
+                case "$confirm" in
+                    "1")
+                        netrogat_remove_domain "$target"
+                        echo -e "${green}Домен $target удалён из netrogat.txt.${plain}"
+                        pause_enter
+                        ;;
+                    *)
+                        echo "Отменено."
+                        sleep 1
+                        ;;
+                esac
+                ;;
+        esac
+    done
+}
+
 #Функция для функции подбора стратегий
 try_strategies() {
     local count="$1"
