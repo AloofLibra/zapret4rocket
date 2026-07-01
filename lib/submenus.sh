@@ -31,7 +31,6 @@ strategies_submenu() {
     submenu_item "	7" "Профиль 7: UDP Games (1026-65531) [${p7_max:-0}]" "udp"
     submenu_item "	8" "Fallback TLS (безразборный блок)"
     submenu_item "	9" "Fallback HTTP (безразборный блок) [${p9_max:-0}]"
-    submenu_item "	10" "Добавить домен в TCP_Custom (RKN-обработка, с/без подбора стратегии)"
     submenu_item "	0" "Назад"
     echo ""
 
@@ -68,8 +67,48 @@ strategies_submenu() {
       "9")
         fallback_http_profile_try
         ;;
-      "10")
+      "0"|"")
+        return
+        ;;
+      *)
+        echo -e "${yellow}Неверный ввод.${plain}"
+        sleep 1
+        ;;
+    esac
+  done
+}
+
+# Подменю управления доменами (пункт 6 главного меню).
+# Объединяет работу с листом исключений netrogat.txt и кастомными доменами TCP_Custom.
+domains_submenu() {
+  while true; do
+    clear -x
+    echo -e "${cyan}--- Управление доменами ---${plain}"
+    echo ""
+    echo -e "${yellow}Исключения (netrogat.txt):${plain}"
+    submenu_item "1" "Добавить домен в исключения"
+    submenu_item "2" "Просмотр/удаление доменов"
+    echo ""
+    echo -e "${yellow}TCP_Custom (RKN-обработка):${plain}"
+    submenu_item "3" "Добавить домен в TCP_Custom (с/без подбора стратегии)"
+    submenu_item "4" "Просмотр/удаление доменов TCP_Custom (с номерами стратегий)"
+    submenu_item "0" "Назад"
+    echo ""
+
+    read -re -p "Ваш выбор: " ans
+
+    case "$ans" in
+      "1")
+        netrogat_add_domain
+        ;;
+      "2")
+        manage_netrogat_list
+        ;;
+      "3")
         manage_custom_rkn_domain
+        ;;
+      "4")
+        manage_custom_rkn_list
         ;;
       "0"|"")
         return
@@ -332,6 +371,18 @@ beginner_guide_menu() {
   echo -e "   Это отдельная настройка для голосовой связи."
   echo -e "   Важно: Для кастомных UDP-стратегий Discord сначала переключи пункт 8 главного меню"
   echo -e "   со стандартных скриптов bol-van на кастомные стратегии для голосовой связи."
+  echo ""
+
+  echo -e "${Fcyan}Управление доменами (Пункт 6 главного меню)${plain}"
+  echo -e "Раздел позволяет гибко настраивать обход или исключение для конкретных сайтов:"
+  echo -e "${Fyellow}1.${plain} Исключения (${green}netrogat.txt${plain}) — белый список. Внеси сюда домены (например, Госуслуги, банки),"
+  echo -e "   которые должны идти напрямую, мимо всех механизмов обхода zapret2."
+  echo -e "${Fyellow}2.${plain} Обработка RKN (${green}TCP_Custom${plain}) — кастомный список сайтов. Нужен, если сайта нет в стандартных"
+  echo -e "   списках, но доступ к нему заблокирован провайдером."
+  echo -e "   При добавлении домена доступны два режима:"
+  echo -e "   - ${yellow}Только добавить:${plain} сайт будет обрабатываться общей для RKN-профиля стратегией (Профиль 3)."
+  echo -e "   - ${yellow}Добавить и подобрать стратегию:${plain} запустить индивидуальный перебор. Для этого конкретного"
+  echo -e "     домена зафиксируется личная рабочая стратегия, даже если общая стратегия RKN для него не подходит."
   echo ""
 
   echo -e "${Fcyan}Полезные ориентиры${plain}"

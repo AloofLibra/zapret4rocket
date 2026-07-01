@@ -1490,7 +1490,7 @@ Enter (без цифр) - переустановка/обновление zapret
 '"${Fcyan}"'3.'"${yellow}"' Запуск blockcheck2 и сохранение SUMMARY
 '"${Fcyan}"'4.'"${yellow}"' Удалить zapret2
 '"${Fcyan}"'5.'"${yellow}"' Обновить стратегии, сбросить листы подбора стратегий и исключений (есть бэкап)
-'"${Fcyan}"'6.'"${yellow}"' Добавить домен в исключения
+'"${Fcyan}"'6.'"${yellow}"' Управление доменами
 '"${Fcyan}"'7.'"${yellow}"' Открыть в редакторе config (Установит nano редактор ~250kb)
 '"${Fcyan}"'8.'"${yellow}"' Переключатель между дефолтными сриптами от bol-van и кастомными стратегиями для голосовой связи. Сейчас: '"${plain}"'['"$(config_mode_text voice)"']'"${yellow}"'
 '"${Fcyan}"'9.'"${yellow}"' Переключатель zapret2 на nftables/iptables (На всё жать Enter). Актуально для OpenWRT 21+. Может помочь с войсами. Сейчас: '"${plain}"'['"$(config_mode_text fwtype)"']'"${yellow}"'
@@ -1580,32 +1580,7 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "6")
-    read -re -p "Введите домен, который добавить в исключения (например, mydomain.com): " user_domain
-    exclude_file="/opt/zapret2/lists/netrogat.txt"
-    mkdir -p /opt/zapret2/lists
-
-    # Очистка файла от пустых строк
-    if [ -f "$exclude_file" ]; then
-      sed -i '/^[[:space:]]*$/d' "$exclude_file" 2>/dev/null || true
-    fi
-
-    if [ -n "$user_domain" ]; then
-      if clean_domain="$(z2r_normalize_domain "$user_domain")"; then
-        # проверка на дубликат (регистронезависимо, точное совпадение строки)
-        if grep -Fixq "$clean_domain" "$exclude_file" 2>/dev/null; then
-          echo -e "Домен ${yellow}$clean_domain${plain} уже есть в исключениях (netrogat.txt)."
-        else
-          echo "$clean_domain" >> "$exclude_file"
-          echo -e "Домен ${yellow}$clean_domain${plain} добавлен в исключения (netrogat.txt)."
-        fi
-      else
-        echo -e "${red}Не удалось распознать домен из ввода:${plain} ${yellow}$user_domain${plain}"
-        echo -e "Укажите домен или ссылку, например: example.com или https://www.youtube.com/watch?v=..."
-      fi
-    else
-      echo "Ввод пустой, ничего не добавлено"
-    fi
-    pause_enter
+    domains_submenu   # сабменю само в цикле и выходит через return
     ;;
 
   "7")
