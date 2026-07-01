@@ -235,8 +235,8 @@ z2r_normalize_domain() {
   d="${d#"${d%%[![:space:]]*}"}"
   d="${d%"${d##*[![:space:]]}"}"
   [ -z "$d" ] && return 1
-  # приводим к нижнему регистру
-  d="$(printf '%s' "$d" | tr '[:upper:]' '[:lower:]')"
+  # приводим к нижнему регистру без классов tr: BusyBox tr для совместимости с OpenWRT
+  d="$(printf '%s' "$d" | sed 'y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/')"
   # убираем схему (http://, https://, ftp:// ...)
   d="${d#*://}"
   # убираем userinfo (всё до последнего @)
