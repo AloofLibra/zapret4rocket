@@ -1566,8 +1566,17 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "4")
-    remove_zapret
-    echo -e "${yellow}zapret2 удалён${plain}"
+    echo -e "${yellow}Внимание! Это приведёт к полному удалению zapret2.${plain}"
+    read -re -p $'\033[33mВы действительно хотите удалить zapret2? Введите 5 - подтвердить удаление, 0 - отмена: \033[0m' del_confirm
+    case "$del_confirm" in
+      "5")
+        remove_zapret
+        echo -e "${yellow}zapret2 удалён${plain}"
+        ;;
+      *)
+        echo -e "${green}Удаление отменено.${plain}"
+        ;;
+    esac
     pause_enter
     ;;
 
