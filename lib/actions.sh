@@ -417,3 +417,304 @@ toggle_rst_guard_mode() {
     done
   fi
 }
+
+# =============================================================================
+# Управление портами NFQWS2_PORTS_TCP / NFQWS2_PORTS_UDP
+# =============================================================================
+# Пользовательские порты добавляются В НАЧАЛО строк (до дефолтных 80/443),
+# через запятую без пробелов.
+#
+# Пользовательскими считаются ВСЕ порты, стоящие в строке слева от якоря:
+#   TCP — слева до порта 80,
+#   UDP — слева до порта 443.
+# Эти порты читаются прямо из config, их же показываем и удаляем.
+# Для TCP дополнительно те же порты добавляются в --filter-tcp блока RKN.
+# Для UDP --filter-udp не трогаем.
+# После изменений просим пользователя перезапустить zapret2 (пункт 22).
+
+# Человекочитаемая метка протокола.
+ports_proto_label() {
+  case "$1" in
+    tcp) printf 'TCP' ;;
+    udp) printf 'UDP' ;;
+    *)   printf '%s' "$1" ;;
+  esac
+}
+
+# Имя переменной в конфиге для протокола.
+ports_var() {
+  case "$1" in
+    tcp) printf 'NFQWS2_PORTS_TCP' ;;
+    udp) printf 'NFQWS2_PORTS_UDP' ;;
+    *) return 1 ;;
+  esac
+}
+
+# Якорь разделения: всё слева от него — пользовательские порты.
+ports_anchor() {
+  case "$1" in
+    tcp) printf '80' ;;
+    udp) printf '443' ;;
+    *) return 1 ;;
+  esac
+}
+
+# Разбить строку портов по якорю. Результат — в глобальных _PORTS_USER/_PORTS_BASE:
+#  _PORTS_USER — всё до якоря (пользовательские порты);
+#  _PORTS_BASE — от якоря до конца (дефолтные/системные).
+# Если якорь не найден — пользовательская часть пуста, база = вся строка.
+ports_split() {
+  local line="$1" anchor="$2"
+  local arr=() t started=0
+  _PORTS_USER=""
+  _PORTS_BASE=""
+  [ -n "$line" ] && IFS=',' read -ra arr <<< "$line"
+  for t in "${arr[@]}"; do
+    [ "$started" -eq 0 ] && [ "$t" = "$anchor" ] && started=1
+    if [ "$started" -eq 0 ]; then
+      [ -n "$t" ] && _PORTS_USER="${_PORTS_USER:+$_PORTS_USER,}$t"
+    else
+      [ -n "$t" ] && _PORTS_BASE="${_PORTS_BASE:+$_PORTS_BASE,}$t"
+    fi
+  done
+  if [ "$started" -eq 0 ]; then
+    _PORTS_BASE="$line"
+    _PORTS_USER=""
+  fi
+}
+
+# Склеить две CSV-части через запятую (пустые опускаются).
+ports_join() {
+  local a="$1" b="$2"
+  if [ -n "$a" ] && [ -n "$b" ]; then printf '%s,%s' "$a" "$b"
+  elif [ -n "$a" ]; then printf '%s' "$a"
+  else printf '%s' "$b"
+  fi
+}
+
+# Проверка корректности порта или диапазона (1-65535). 0 - ок, 1 - мусор.
+ports_validate() {
+  local token="$1" start end
+  case "$token" in
+    ""|*[!0-9-]*) return 1 ;;  # пусто или недопустимые символы
+  esac
+  if printf '%s' "$token" | grep -q -- '-'; then
+    # диапазон START-END
+    start="${token%%-*}"
+    end="${token#*-}"
+    case "$end" in *-*) return 1 ;; esac  # второй дефис недопустим
+    [ -n "$start" ] && [ -n "$end" ] || return 1
+    [ "$start" -ge 1 ] 2>/dev/null && [ "$start" -le 65535 ] 2>/dev/null || return 1
+    [ "$end"   -ge 1 ] 2>/dev/null && [ "$end"   -le 65535 ] 2>/dev/null || return 1
+    [ "$start" -le "$end" ] || return 1
+  else
+    [ "$token" -ge 1 ] 2>/dev/null && [ "$token" -le 65535 ] 2>/dev/null || return 1
+  fi
+  return 0
+}
+
+# Есть ли точное совпадение токена в CSV-строке? (0 - есть, 1 - нет)
+csv_contains_token() {
+  local csv="$1" token="$2"
+  local arr=() t
+  [ -n "$csv" ] || return 1
+  IFS=',' read -ra arr <<< "$csv"
+  for t in "${arr[@]}"; do
+    [ "$t" = "$token" ] && return 0
+  done
+  return 1
+}
+
+# Удалить точное совпадение токена из CSV (печатает результат).
+csv_remove_token() {
+  local csv="$1" token="$2"
+  local arr=() t out=""
+  [ -n "$csv" ] || return 0
+  IFS=',' read -ra arr <<< "$csv"
+  for t in "${arr[@]}"; do
+    [ -n "$t" ] || continue
+    [ "$t" = "$token" ] && continue
+    if [ -z "$out" ]; then out="$t"; else out="$out,$t"; fi
+  done
+  printf '%s' "$out"
+}
+
+# Записать строку --filter-tcp блока RKN = пользовательские TCP-порты + база из конфига.
+# Базовые порты (от якоря 80 и правее) берутся прямо из NFQWS2_PORTS_TCP — без констант.
+ports_set_rkn_filter() {
+  local cfg="$1" user="$2"
+  local tcp_line rkn_ports
+  tcp_line="$(config_get_var "$cfg" NFQWS2_PORTS_TCP)"
+  ports_split "$tcp_line" "80"
+  rkn_ports="$(ports_join "$user" "$_PORTS_BASE")"
+  # Диапазон от комментария RKN до ближайшего --new; внутри него меняем
+  # единственную строку --filter-tcp=... --filter-l7=tls.
+  sed -i "/#Стратегии для RKN/,/^[[:space:]]*--new[[:space:]]*\$/ s/^--filter-tcp=.*--filter-l7=tls[[:space:]]*\$/--filter-tcp=${rkn_ports} --filter-l7=tls/" "$cfg"
+}
+
+# Добавление пользовательских портов (tcp|udp).
+# Порты добавляются в начало строки (до якоря 80/443) и читаются прямо из config.
+ports_add() {
+  local proto="$1" cfg="/opt/zapret2/config"
+  local var anchor label line input tok added="" skipped=""
+  local arr=() new_user
+
+  var="$(ports_var "$proto")" || return 1
+  anchor="$(ports_anchor "$proto")"
+  label="$(ports_proto_label "$proto")"
+  line="$(config_get_var "$cfg" "$var")"
+  ports_split "$line" "$anchor"
+  new_user="$_PORTS_USER"
+
+  clear -x
+  echo -e "${cyan}--- Добавление ${label} портов ---${plain}"
+  echo "Порты добавляются В НАЧАЛО строки $var (до дефолтных)."
+  if [ "$proto" = "tcp" ]; then
+    echo "TCP-порты также попадают в стратегию RKN (--filter-tcp)."
+  else
+    echo "UDP-порты добавляются только в $var (стратегии не меняются)."
+  fi
+  echo "Формат: один порт (8080) или диапазон (9000-9100)."
+  echo "Несколько значений — через запятую без пробелов: 8080,9090,9000-9100"
+  echo ""
+  read -re -p "Введите порты: " input
+  if [ -n "$input" ]; then
+    # убираем любые пробелы
+    input="$(printf '%s' "$input" | tr -d '[:space:]')"
+    [ -n "$input" ] && IFS=',' read -ra arr <<< "$input"
+  fi
+
+  for tok in "${arr[@]}"; do
+    [ -n "$tok" ] || continue
+    if ! ports_validate "$tok"; then
+      skipped="${skipped}${tok},"
+      continue
+    fi
+    # дубликат: уже есть в строке конфига
+    if csv_contains_token "$line" "$tok"; then
+      skipped="${skipped}${tok},"
+      continue
+    fi
+    new_user="$(ports_join "$new_user" "$tok")"
+    added="${added}${tok},"
+  done
+
+  if [ -z "$added" ]; then
+    echo -e "${yellow}Ничего не добавлено.${plain}"
+    [ -n "$skipped" ] && echo -e "${yellow}Пропущено (некорректно/дубликаты): ${skipped%,}${plain}"
+    pause_enter
+    return 0
+  fi
+
+  config_set_var "$cfg" "$var" "$(ports_join "$new_user" "$_PORTS_BASE")"
+  [ "$proto" = "tcp" ] && ports_set_rkn_filter "$cfg" "$new_user"
+
+  echo -e "${green}Добавлено ${label}: ${added%,}${plain}"
+  [ -n "$skipped" ] && echo -e "${yellow}Пропущено: ${skipped%,}${plain}"
+  echo -e "${green}Строка $var: $(config_get_var "$cfg" "$var")${plain}"
+  echo -e "${yellow}Для применения изменений перезапустите zapret2: пункт 22 главного меню.${plain}"
+  pause_enter
+  return 0
+}
+
+# Просмотр и удаление пользовательских портов (tcp|udp).
+# Показываются только порты слева от якоря (80/443) — их и можно удалить.
+ports_manage() {
+  local proto="$1" cfg="/opt/zapret2/config"
+  local var anchor label line choice confirm i target
+  local ports=()
+
+  var="$(ports_var "$proto")" || return 1
+  anchor="$(ports_anchor "$proto")"
+  label="$(ports_proto_label "$proto")"
+
+  while true; do
+    clear -x
+    line="$(config_get_var "$cfg" "$var")"
+    ports_split "$line" "$anchor"
+    ports=()
+    [ -n "$_PORTS_USER" ] && IFS=',' read -ra ports <<< "$_PORTS_USER"
+
+    echo -e "${cyan}--- Пользовательские ${label} порты ---${plain}"
+    echo -e "Полная строка $var: ${green}$line${plain}"
+    echo ""
+
+    if [ "${#ports[@]}" -eq 0 ]; then
+      echo -e "${yellow}Нет добавленных ${label} портов.${plain}"
+      echo ""
+      pause_enter
+      return 0
+    fi
+
+    echo -e "${yellow}Добавленные порты (можно удалить только эти):${plain}"
+    echo ""
+    i=1
+    for p in "${ports[@]}"; do
+      printf "  ${Fcyan}%s.${plain} ${green}%s${plain}\n" "$i" "$p"
+      i=$((i+1))
+    done
+    echo ""
+    echo -e "Введите номер порта для удаления, ${Fyellow}0${plain} - назад."
+    read -re -p "Ваш выбор: " choice
+
+    case "$choice" in
+      "0"|"")
+        return 0
+        ;;
+      *)
+        if ! printf '%s' "$choice" | grep -Eq '^[0-9]+$'; then
+          echo -e "${red}Некорректный ввод.${plain}"
+          sleep 1
+          continue
+        fi
+        if [ "$choice" -lt 1 ] || [ "$choice" -gt "${#ports[@]}" ]; then
+          echo -e "${red}Номер вне диапазона.${plain}"
+          sleep 1
+          continue
+        fi
+        target="${ports[$((choice-1))]}"
+        echo ""
+        echo -e "${yellow}Удалить порт ${green}${target}${yellow} из строки $var?"
+        [ "$proto" = "tcp" ] && echo "(также убирается из стратегии RKN)"
+        echo "1 - да, удалить"
+        echo "0 - отмена"
+        read -re -p "Ваш выбор: " confirm
+        case "$confirm" in
+          "1")
+            local new_user
+            new_user="$(csv_remove_token "$_PORTS_USER" "$target")"
+            config_set_var "$cfg" "$var" "$(ports_join "$new_user" "$_PORTS_BASE")"
+            [ "$proto" = "tcp" ] && ports_set_rkn_filter "$cfg" "$new_user"
+            echo -e "${green}Порт ${target} удалён.${plain}"
+            echo -e "${green}Строка $var: $(config_get_var "$cfg" "$var")${plain}"
+            echo -e "${yellow}Для применения изменений перезапустите zapret2: пункт 22 главного меню.${plain}"
+            pause_enter
+            ;;
+          *)
+            echo "Отменено."
+            sleep 1
+            ;;
+        esac
+        ;;
+    esac
+  done
+}
+
+# Краткий статус для строки главного меню: сколько портов слева от якорей.
+# Необязательный аргумент — путь к конфигу (по умолчанию /opt/zapret2/config).
+ports_menu_status() {
+  local cfg="${1:-/opt/zapret2/config}"
+  local tcp udp n=0 arr=()
+  [ -f "$cfg" ] || { printf 'дефолт'; return 0; }
+  tcp="$(config_get_var "$cfg" NFQWS2_PORTS_TCP)"
+  udp="$(config_get_var "$cfg" NFQWS2_PORTS_UDP)"
+  ports_split "$tcp" "80"
+  [ -n "$_PORTS_USER" ] && { IFS=',' read -ra arr <<< "$_PORTS_USER"; n=$((n + ${#arr[@]})); }
+  ports_split "$udp" "443"
+  [ -n "$_PORTS_USER" ] && { IFS=',' read -ra arr <<< "$_PORTS_USER"; n=$((n + ${#arr[@]})); }
+  if [ "$n" -gt 0 ]; then
+    printf 'добавлено портов: %s' "$n"
+  else
+    printf 'дефолт'
+  fi
+}

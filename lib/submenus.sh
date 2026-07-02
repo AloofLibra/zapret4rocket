@@ -121,6 +121,54 @@ domains_submenu() {
   done
 }
 
+# Подменю управления портами (пункт 20 главного меню).
+# Пользовательские порты добавляются в начало NFQWS2_PORTS_TCP/UDP.
+# TCP-порты дополнительно попадают в стратегию RKN; UDP-стратегии не меняются.
+ports_submenu() {
+  local cfg="/opt/zapret2/config"
+  while true; do
+    clear -x
+    echo -e "${cyan}--- Управление портами ---${plain}"
+    echo ""
+    echo -e "${yellow}TCP:${plain} ${green}$(config_get_var "$cfg" NFQWS2_PORTS_TCP)${plain}"
+    echo -e "${yellow}UDP:${plain} ${green}$(config_get_var "$cfg" NFQWS2_PORTS_UDP)${plain}"
+    echo ""
+    echo -e "${yellow}TCP (добавляются в NFQWS2_PORTS_TCP и в стратегию RKN):${plain}"
+    submenu_item "1" "Добавить TCP порт(ы)"
+    submenu_item "2" "Просмотр/удаление TCP портов"
+    echo ""
+    echo -e "${yellow}UDP (добавляются только в NFQWS2_PORTS_UDP):${plain}"
+    submenu_item "3" "Добавить UDP порт(ы)"
+    submenu_item "4" "Просмотр/удаление UDP портов"
+    submenu_item "0" "Назад"
+    echo ""
+
+    read -re -p "Ваш выбор: " ans
+
+    case "$ans" in
+      "1")
+        ports_add tcp
+        ;;
+      "2")
+        ports_manage tcp
+        ;;
+      "3")
+        ports_add udp
+        ;;
+      "4")
+        ports_manage udp
+        ;;
+      "0"|"")
+        return
+        ;;
+      *)
+        echo -e "${yellow}Неверный ввод.${plain}"
+        sleep 1
+        ;;
+    esac
+  done
+}
+
 flowoffload_submenu() {
   while true; do
     clear -x
