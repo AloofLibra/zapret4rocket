@@ -1503,6 +1503,7 @@ Enter (без цифр) - переустановка/обновление zapret
 '"${Fcyan}"'16.'"${yellow}"' Сменить TLS blob (--blob=maxru). Сейчас: '"${plain}"'['"$(config_mode_text tls_blob_menu)"']'"${yellow}"'
 '"${Fcyan}"'18.'"${yellow}"' Защита от RST-инъекций. (BETA) Сейчас: '"${plain}"'['"$(config_mode_text rst_guard)"']'"${yellow}"'
 '"${Fcyan}"'19.'"${yellow}"' Дополнительные настройки
+'"${Fcyan}"'20.'"${yellow}"' Управление портами NFQWS2 (TCP/UDP). Сейчас: '"${plain}"'['"$(ports_menu_status)"']'"${yellow}"'
 '"${Fcyan}"'777.'"${yellow}"' Активировать zeefeer premium (Нажимать только Valery ProD, avg97, Xoz, GeGunT, blagodarenya, mikhyan, Xoz, andric62, Whoze, Necronicle, Andrei_5288515371, Nomand, Dina_turat, Nergalss, Александру, АлександруП, vecheromholodno, ЕвгениюГ, Dyadyabo, skuwakin, izzzgoy, Grigaraz, Reconnaissance, comandante1928, umad, rudnev2028, rutakote, railwayfx, vtokarev1604, Grigaraz, a40letbezurojaya и subzeero452 и остальным поддержавшим проект. Но если очень хочется - можно нажать и другим)\033[0m'
     echo -e "${Bred}${Fplain}17. Не знаешь, с чего начать? Есть проблемы? Жми сюда!${plain}"
 	if [[ -f "$PREMIUM_FLAG" ]]; then
@@ -1667,6 +1668,10 @@ Enter (без цифр) - переустановка/обновление zapret
 
   "19")
     advanced_settings_submenu
+    ;;
+
+  "20")
+    ports_submenu
     ;;
 
   "777")
